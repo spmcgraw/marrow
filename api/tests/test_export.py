@@ -26,15 +26,18 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://freehold:freehold@localho
 
 
 class FakeStorageAdapter(StorageAdapter):
-    def __init__(self, files: dict[tuple[str, str], bytes]) -> None:
+    def __init__(self, files: dict[tuple[str, str], bytes] | None = None) -> None:
         # keys are (attachment_id, filename)
-        self._files = files
+        self._files: dict[tuple[str, str], bytes] = files or {}
 
     def read(self, attachment_id: str, filename: str) -> bytes:
         key = (attachment_id, filename)
         if key not in self._files:
             raise FileNotFoundError(f"No fake file for {key}")
         return self._files[key]
+
+    def write(self, attachment_id: str, filename: str, data: bytes) -> None:
+        self._files[(attachment_id, filename)] = data
 
 
 # ---------------------------------------------------------------------------
@@ -186,12 +189,17 @@ def test_manifest_content(seeded, session, tmp_path):
     assert manifest["schema_version"] == SCHEMA_VERSION
     assert manifest["workspace"]["slug"] == ws.slug
     assert manifest["workspace"]["id"] == str(ws.id)
-    assert manifest["page_count"] == 2
-    assert manifest["attachment_count"] == 1
+
+    assert len(manifest["spaces"]) == 1
+    assert len(manifest["collections"]) == 1
+    assert len(manifest["pages"]) == 2
+    assert len(manifest["revisions"]) == 4  # rev1a, rev1b, rev1c, rev2
+    assert len(manifest["attachments"]) == 1
 
     att_record = manifest["attachments"][0]
     assert att_record["hash"] == seeded["attachment"].hash
     assert att_record["filename"] == "photo.png"
+    assert "created_at" in att_record
 
 
 def test_page_content_matches_current_revision(seeded, session, tmp_path):

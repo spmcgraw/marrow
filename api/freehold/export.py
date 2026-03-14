@@ -76,6 +76,15 @@ def _build_manifest(
     attachment_records: list[dict],
     export_timestamp: str,
 ) -> dict:
+    spaces = workspace.spaces
+    collections = [c for s in spaces for c in s.collections]
+
+    revision_records = [
+        {"id": str(rev.id), "page_id": str(rev.page_id), "created_at": rev.created_at.isoformat()}
+        for page in pages
+        for rev in page.revisions
+    ]
+
     return {
         "schema_version": SCHEMA_VERSION,
         "export_timestamp": export_timestamp,
@@ -85,8 +94,40 @@ def _build_manifest(
             "name": workspace.name,
             "created_at": workspace.created_at.isoformat(),
         },
-        "page_count": len(pages),
-        "attachment_count": len(attachment_records),
+        "spaces": [
+            {
+                "id": str(s.id),
+                "workspace_id": str(s.workspace_id),
+                "slug": s.slug,
+                "name": s.name,
+                "created_at": s.created_at.isoformat(),
+            }
+            for s in spaces
+        ],
+        "collections": [
+            {
+                "id": str(c.id),
+                "space_id": str(c.space_id),
+                "slug": c.slug,
+                "name": c.name,
+                "created_at": c.created_at.isoformat(),
+            }
+            for c in collections
+        ],
+        "pages": [
+            {
+                "id": str(p.id),
+                "collection_id": str(p.collection_id),
+                "slug": p.slug,
+                "title": p.title,
+                "current_revision_id": (
+                    str(p.current_revision_id) if p.current_revision_id else None
+                ),
+                "created_at": p.created_at.isoformat(),
+            }
+            for p in pages
+        ],
+        "revisions": revision_records,
         "attachments": attachment_records,
     }
 
@@ -158,6 +199,7 @@ def export_workspace(
                     "filename": att.filename,
                     "hash": att.hash,
                     "size_bytes": att.size_bytes,
+                    "created_at": att.created_at.isoformat(),
                 }
             )
 

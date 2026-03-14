@@ -50,5 +50,40 @@ def export(
         raise typer.Exit(1)
 
 
+@app.command()
+def restore(
+    bundle: Path = typer.Argument(..., help="Path to the export bundle zip file"),
+    database_url: str | None = typer.Option(
+        None, "--database-url", envvar="DATABASE_URL", help="PostgreSQL connection URL"
+    ),
+    storage_path: str | None = typer.Option(
+        None, "--storage-path", envvar="STORAGE_PATH", help="Path to attachment storage directory"
+    ),
+) -> None:
+    """Restore a workspace from an export bundle."""
+    load_dotenv()
+
+    import os
+
+    from .db import get_session
+    from .restore import restore_workspace
+    from .storage import LocalFilesystemAdapter
+
+    storage_root = storage_path or os.getenv("STORAGE_PATH", "/var/lib/freehold/attachments")
+    storage = LocalFilesystemAdapter(storage_root)
+
+    try:
+        with get_session(database_url) as session:
+            slug = restore_workspace(bundle, session, storage)
+            session.commit()
+        typer.echo(f"Restored workspace '{slug}'")
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1)
+    except (RuntimeError, FileNotFoundError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()

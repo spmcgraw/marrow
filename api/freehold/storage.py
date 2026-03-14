@@ -11,9 +11,14 @@ class StorageAdapter(ABC):
         """Return the raw bytes for an attachment."""
         ...
 
+    @abstractmethod
+    def write(self, attachment_id: str, filename: str, data: bytes) -> None:
+        """Persist *data* for an attachment."""
+        ...
+
 
 class LocalFilesystemAdapter(StorageAdapter):
-    """Reads attachments from a local directory tree: <base>/<attachment_id>/<filename>."""
+    """Reads/writes attachments in a local directory tree: <base>/<attachment_id>/<filename>."""
 
     def __init__(self, base_path: str | Path) -> None:
         self.base_path = Path(base_path)
@@ -23,6 +28,11 @@ class LocalFilesystemAdapter(StorageAdapter):
         if not path.exists():
             raise FileNotFoundError(f"Attachment file not found: {path}")
         return path.read_bytes()
+
+    def write(self, attachment_id: str, filename: str, data: bytes) -> None:
+        path = self.base_path / attachment_id / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
 
 
 def get_default_adapter() -> StorageAdapter:
