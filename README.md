@@ -76,7 +76,7 @@ Freehold is designed to grow toward being the layer where knowledge and executio
 
 ## Data model (core)
 
-```
+```text
 workspaces
 spaces
 collections
@@ -97,7 +97,7 @@ The revision table is the heart of the restore guarantee. Current page state poi
 
 A Freehold export bundle is a `.zip` file with the following structure:
 
-```
+```text
 freehold-export-{workspace-slug}-{timestamp}.zip
 ├── manifest.json          # workspace metadata, export timestamp, schema version
 ├── pages/
@@ -116,7 +116,7 @@ The restore guarantee means: given this bundle and a fresh Freehold installation
 
 ## Getting started (development)
 
-**Prerequisites:** Python 3.11+, Node.js 18+, Docker (for PostgreSQL)
+**Prerequisites:** Python 3.11+, Node.js 20+, Docker (for PostgreSQL)
 
 ### 1. Start PostgreSQL
 
@@ -157,6 +157,7 @@ In a separate terminal:
 ```bash
 cd web
 npm install
+cp .env.local.example .env.local # set NEXT_PUBLIC_API_URL (and API key if used)
 npm run dev                      # http://localhost:3000
 ```
 

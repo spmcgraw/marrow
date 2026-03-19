@@ -3,14 +3,21 @@
 /**
  * PageEditor — the main editing surface.
  *
- * Uses a plain <textarea> for Markdown input.
- * TODO: replace the textarea with a Tiptap editor once the data flow is stable.
+ * Uses BlockNote for a Notion-style block editor.
+ * Content is serialized to/from Markdown for storage so the export bundle
+ * remains human-readable. BlockNote's internal JSON is never persisted.
  *
- * Save behavior: auto-saves 2 seconds after the user stops typing, and on blur.
+ * Save behavior: auto-saves 2 seconds after the user stops typing.
  * Each save creates a new revision via PATCH /api/pages/{id}.
  */
 
+import "@blocknote/core/fonts/inter.css";
+import "@blocknote/mantine/style.css";
+
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTheme } from "next-themes";
+import { useCreateBlockNote } from "@blocknote/react";
+import { BlockNoteView } from "@blocknote/mantine";
 import { Clock, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -40,41 +47,96 @@ interface Props {
 
 export function PageEditor({ initialPage }: Props) {
   const [title, setTitle] = useState(initialPage.title);
-  const [content, setContent] = useState(initialPage.content ?? "");
   const [status, setStatus] = useState<SaveStatus>("idle");
+  const { resolvedTheme } = useTheme();
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Refs for save logic — avoids stale closures in debounce callbacks
+  const titleRef = useRef(title);
   const savedTitleRef = useRef(initialPage.title);
   const savedContentRef = useRef(initialPage.content ?? "");
+  const pendingMarkdownRef = useRef(initialPage.content ?? "");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isInitializingRef = useRef(false);
 
-  const save = useCallback(async () => {
-    const newTitle = title !== savedTitleRef.current ? title : undefined;
-    const newContent = content !== savedContentRef.current ? content : undefined;
+  useEffect(() => {
+    titleRef.current = title;
+  }, [title]);
+
+  const editor = useCreateBlockNote();
+
+  // Parse initial Markdown content into BlockNote blocks on mount
+  useEffect(() => {
+    const content = initialPage.content;
+    if (!content) return;
+
+    isInitializingRef.current = true;
+    const blocks = editor.tryParseMarkdownToBlocks(content);
+    editor.replaceBlocks(editor.document, blocks);
+    isInitializingRef.current = false;
+    pendingMarkdownRef.current = content;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const saveNow = useCallback(async () => {
+    const currentTitle = titleRef.current;
+    const currentContent = pendingMarkdownRef.current;
+
+    const newTitle = currentTitle !== savedTitleRef.current ? currentTitle : undefined;
+    const newContent =
+      currentContent !== savedContentRef.current ? currentContent : undefined;
 
     if (!newTitle && newContent === undefined) return;
 
     setStatus("saving");
     try {
       await updatePage(initialPage.id, { title: newTitle, content: newContent });
-      savedTitleRef.current = title;
-      savedContentRef.current = content;
+      savedTitleRef.current = currentTitle;
+      savedContentRef.current = currentContent;
       setStatus("saved");
       setTimeout(() => setStatus("idle"), 2000);
     } catch (err) {
       toast.error(`Save failed: ${String(err)}`);
       setStatus("error");
     }
-  }, [initialPage.id, title, content]);
+  }, [initialPage.id]);
 
-  useEffect(() => {
+  const scheduleSave = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(save, 2000);
+    debounceRef.current = setTimeout(saveNow, 2000);
+  }, [saveNow]);
+
+  // Debounce save on title change
+  useEffect(() => {
+    scheduleSave();
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [title, content, save]);
+  }, [title, scheduleSave]);
 
-  const statusLabel = { idle: "", saving: "Saving…", saved: "Saved", error: "Error saving" }[status];
+  // Serialize editor blocks to Markdown and schedule a save
+  const handleEditorChange = useCallback(() => {
+    if (isInitializingRef.current) return;
+    const markdown = editor.blocksToMarkdownLossy(editor.document);
+    pendingMarkdownRef.current = markdown;
+    scheduleSave();
+  }, [editor, scheduleSave]);
+
+  // Restore a revision: parse its Markdown into blocks and update editor
+  const handleRestore = useCallback(
+    async (markdownContent: string) => {
+      const blocks = editor.tryParseMarkdownToBlocks(markdownContent);
+      editor.replaceBlocks(editor.document, blocks);
+      pendingMarkdownRef.current = markdownContent;
+      scheduleSave();
+    },
+    [editor, scheduleSave],
+  );
+
+  const statusLabel = {
+    idle: "",
+    saving: "Saving…",
+    saved: "Saved",
+    error: "Error saving",
+  }[status];
 
   return (
     <div className="flex h-full flex-col">
@@ -83,29 +145,28 @@ export function PageEditor({ initialPage }: Props) {
         <span className="text-xs text-muted-foreground">{statusLabel}</span>
         <div className="flex gap-2">
           <AttachmentSheet pageId={initialPage.id} collectionId={initialPage.collection_id} />
-          <RevisionSheet pageId={initialPage.id} onRestore={(c) => setContent(c)} />
+          <RevisionSheet pageId={initialPage.id} onRestore={handleRestore} />
         </div>
       </div>
 
       {/* Title */}
-      <div className="px-8 pt-8">
+      <div className="px-8 pt-8 pb-2">
         <input
           className="w-full bg-transparent text-3xl font-bold outline-none placeholder:text-muted-foreground"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          onBlur={save}
+          onBlur={saveNow}
           placeholder="Untitled"
         />
       </div>
 
-      {/* Editor — plain textarea; Tiptap replaces this later */}
-      <div className="flex-1 px-8 py-4">
-        <textarea
-          className="h-full w-full resize-none bg-transparent font-mono text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          onBlur={save}
-          placeholder="Start writing in Markdown…"
+      {/* BlockNote editor */}
+      <div className="flex-1 overflow-auto">
+        <BlockNoteView
+          editor={editor}
+          onChange={handleEditorChange}
+          theme={resolvedTheme === "dark" ? "dark" : "light"}
+          style={{ minHeight: "100%" }}
         />
       </div>
     </div>
@@ -121,7 +182,7 @@ function RevisionSheet({
   onRestore,
 }: {
   pageId: string;
-  onRestore: (content: string) => void;
+  onRestore: (content: string) => Promise<void>;
 }) {
   const [revisions, setRevisions] = useState<Revision[]>([]);
   const [selected, setSelected] = useState<Revision | null>(null);
@@ -181,7 +242,7 @@ function RevisionSheet({
             ))}
           </ScrollArea>
 
-          {/* Preview */}
+          {/* Preview — raw Markdown for readability */}
           <div className="flex flex-1 flex-col overflow-hidden">
             {selected ? (
               <>
@@ -194,8 +255,8 @@ function RevisionSheet({
                   <Button
                     size="sm"
                     className="w-full"
-                    onClick={() => {
-                      onRestore(selected.content!);
+                    onClick={async () => {
+                      await onRestore(selected.content!);
                       toast.success("Revision restored — save to confirm");
                     }}
                   >
