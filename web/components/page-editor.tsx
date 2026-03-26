@@ -212,11 +212,9 @@ function RevisionSheet({
   return (
     <Sheet onOpenChange={(open) => open && load()}>
       {/* Base UI uses render prop instead of asChild */}
-      <SheetTrigger render={<span />}>
-        <Button variant="ghost" size="sm" onClick={() => {}}>
-          <Clock className="mr-1 h-4 w-4" />
-          History
-        </Button>
+      <SheetTrigger render={<Button variant="ghost" size="sm" />}>
+        <Clock className="mr-1 h-4 w-4" />
+        History
       </SheetTrigger>
       <SheetContent className="flex flex-col gap-0 p-0 sm:max-w-lg">
         <SheetHeader className="border-b px-4 py-3">
@@ -318,11 +316,9 @@ function AttachmentSheet({
 
   return (
     <Sheet onOpenChange={(open) => open && load()}>
-      <SheetTrigger render={<span />}>
-        <Button variant="ghost" size="sm" onClick={() => {}}>
-          <Upload className="mr-1 h-4 w-4" />
-          Attachments
-        </Button>
+      <SheetTrigger render={<Button variant="ghost" size="sm" />}>
+        <Upload className="mr-1 h-4 w-4" />
+        Attachments
       </SheetTrigger>
       <SheetContent className="flex flex-col gap-0 p-0">
         <SheetHeader className="border-b px-4 py-3">
