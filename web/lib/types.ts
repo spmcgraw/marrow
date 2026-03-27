@@ -49,6 +49,23 @@ export interface Attachment {
   created_at: string;
 }
 
+// Search
+export interface SearchResultItem {
+  page_id: string;
+  title: string;
+  snippet: string;
+  collection_id: string;
+  space_id: string;
+  space_name: string;
+  collection_name: string;
+  rank: number;
+}
+
+export interface SearchResponse {
+  query: string;
+  results: SearchResultItem[];
+}
+
 // Nested tree for sidebar rendering
 export interface PageTreeItem {
   id: string;

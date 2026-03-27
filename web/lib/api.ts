@@ -10,6 +10,7 @@ import type {
   Collection,
   Page,
   Revision,
+  SearchResponse,
   Space,
   Workspace,
   WorkspaceTree,
@@ -66,6 +67,14 @@ export function getWorkspace(id: string): Promise<Workspace> {
 
 export function getWorkspaceTree(id: string): Promise<WorkspaceTree> {
   return apiFetch(`/api/workspaces/${id}/tree`);
+}
+
+// ---------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------
+
+export function searchWorkspace(workspaceId: string, query: string): Promise<SearchResponse> {
+  return apiFetch(`/api/workspaces/${workspaceId}/search?q=${encodeURIComponent(query)}`);
 }
 
 // ---------------------------------------------------------------------------

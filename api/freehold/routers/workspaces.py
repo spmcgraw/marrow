@@ -6,9 +6,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..dependencies import get_db
+from ..dependencies import get_db, get_search_backend
 from ..models import Workspace
-from ..schemas import WorkspaceCreate, WorkspaceRead, WorkspaceTree
+from ..schemas import (
+    SearchResponse,
+    SearchResultItem,
+    WorkspaceCreate,
+    WorkspaceRead,
+    WorkspaceTree,
+)
+from ..search import SearchBackend
 
 router = APIRouter(prefix="/api/workspaces", tags=["workspaces"])
 
@@ -50,6 +57,27 @@ def get_workspace_tree(workspace_id: UUID, db: Session = Depends(get_db)):
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     return ws
+
+
+@router.get("/{workspace_id}/search", response_model=SearchResponse)
+def search_workspace(
+    workspace_id: UUID,
+    q: str = "",
+    db: Session = Depends(get_db),
+    search: SearchBackend = Depends(get_search_backend),
+):
+    ws = db.get(Workspace, workspace_id)
+    if ws is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    if not q.strip():
+        return SearchResponse(query=q, results=[])
+
+    results = search.search(workspace_id, q.strip(), db)
+    return SearchResponse(
+        query=q,
+        results=[SearchResultItem(**vars(r)) for r in results],
+    )
 
 
 @router.delete("/{workspace_id}", status_code=204)

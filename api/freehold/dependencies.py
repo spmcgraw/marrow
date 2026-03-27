@@ -13,6 +13,7 @@ from fastapi import Header, HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from .search import PostgresSearchBackend, SearchBackend
 from .storage import StorageAdapter, get_default_adapter
 
 # Load .env so the module works when run directly (uvicorn main:app) without
@@ -50,6 +51,17 @@ _storage: StorageAdapter = get_default_adapter()
 
 def get_storage() -> StorageAdapter:
     return _storage
+
+
+# ---------------------------------------------------------------------------
+# Search
+# ---------------------------------------------------------------------------
+
+_search_backend: SearchBackend = PostgresSearchBackend()
+
+
+def get_search_backend() -> SearchBackend:
+    return _search_backend
 
 
 # ---------------------------------------------------------------------------

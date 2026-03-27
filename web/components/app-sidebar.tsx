@@ -27,6 +27,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createCollection, createPage, createSpace, slugify } from "@/lib/api";
+import { SearchDialog } from "@/components/search-dialog";
 import type { CollectionTreeItem, SpaceTreeItem, WorkspaceTree } from "@/lib/types";
 
 interface Props {
@@ -249,6 +250,9 @@ export function AppSidebar({ tree }: Props) {
               refresh();
             }}
           />
+        </div>
+        <div className="px-2 pb-2">
+          <SearchDialog workspaceId={tree.id} />
         </div>
       </SidebarHeader>
 

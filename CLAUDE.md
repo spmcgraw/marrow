@@ -110,13 +110,15 @@ freehold/
 │   ├── .env.example
 │   ├── alembic/
 │   │   └── versions/
-│   │       └── 69d839126d73_create_core_schema.py
+│   │       ├── 69d839126d73_create_core_schema.py
+│   │       └── d3981f696939_add_full_text_search.py
 │   ├── freehold/                     # Main package
 │   │   ├── app.py                    # FastAPI app factory, CORS middleware
 │   │   ├── db.py                     # SQLAlchemy session management
-│   │   ├── dependencies.py           # FastAPI dependency providers (api key, db session)
+│   │   ├── dependencies.py           # FastAPI dependency providers (api key, db session, search)
 │   │   ├── models.py                 # SQLAlchemy ORM models
 │   │   ├── schemas.py                # Pydantic request/response schemas
+│   │   ├── search.py                 # SearchBackend ABC + PostgresSearchBackend
 │   │   ├── storage.py                # StorageAdapter ABC + LocalFilesystemAdapter
 │   │   ├── export.py                 # Export workspace → zip bundle
 │   │   ├── restore.py                # Restore workspace ← zip bundle
@@ -132,7 +134,8 @@ freehold/
 │   │   ├── test_migration_cycle.py
 │   │   ├── test_export.py
 │   │   ├── test_restore.py
-│   │   └── test_round_trip.py        # Critical regression anchor
+│   │   ├── test_round_trip.py        # Critical regression anchor
+│   │   └── test_search.py           # FTS trigger + search scoping tests
 │   └── storage/                      # Default local attachment storage (gitignored)
 │
 ├── web/                              # Next.js frontend
@@ -146,7 +149,8 @@ freehold/
 │   │       └── pages/[pageId]/
 │   │           └── page.tsx          # Page editor
 │   ├── components/
-│   │   ├── app-sidebar.tsx           # Tree nav: Spaces → Collections → Pages
+│   │   ├── app-sidebar.tsx           # Tree nav: Spaces → Collections → Pages + search
+│   │   ├── search-dialog.tsx         # Cmd+K search dialog
 │   │   ├── page-editor.tsx           # Title + markdown textarea, auto-save, attachments, revisions
 │   │   └── ui/                       # Shadcn/Base UI components
 │   ├── lib/
@@ -182,7 +186,7 @@ workspaces → spaces → collections → pages → blocks (future)
 | workspaces | id, slug (unique), name |
 | spaces | id, workspace_id (FK cascade), slug (unique per workspace), name |
 | collections | id, space_id (FK cascade), slug (unique per space), name |
-| pages | id, collection_id (FK cascade), slug (unique per collection), title, current_revision_id (deferred FK) |
+| pages | id, collection_id (FK cascade), slug (unique per collection), title, current_revision_id (deferred FK), search_vector (tsvector, GIN-indexed, trigger-managed) |
 | revisions | id, page_id (FK cascade), content (TEXT) — **immutable via PG trigger** |
 | attachments | id, page_id (FK cascade), filename, hash (SHA256), size_bytes |
 
@@ -200,6 +204,7 @@ All routes are prefixed with `/api`. Authentication is enforced via `X-API-Key` 
 | GET/POST | /api/workspaces/ | List / create workspaces |
 | GET/DELETE | /api/workspaces/{id} | Get / delete workspace |
 | GET | /api/workspaces/{id}/tree | Full hierarchy (sidebar) |
+| GET | /api/workspaces/{id}/search?q= | Full-text search across workspace pages |
 | GET/POST | /api/workspaces/{id}/spaces/ | List / create spaces |
 | GET/DELETE | /api/workspaces/{id}/spaces/{sid} | Get / delete space |
 | GET/POST | /api/spaces/{sid}/collections/ | List / create collections |
@@ -272,7 +277,7 @@ Tests in `api/tests/` are **integration tests** — they hit a real database. A 
 
 ## What's Not Built Yet
 
-- Full-text search (PostgreSQL FTS / Meilisearch)
+- Meilisearch upgrade for fuzzy/typo-tolerant search (PostgreSQL FTS is implemented)
 - S3-compatible storage adapter
 - Rich text / TipTap editor (currently plain Markdown textarea)
 - User authentication and permissions (API key is the only auth layer)

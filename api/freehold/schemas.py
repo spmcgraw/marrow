@@ -5,7 +5,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-
 # ---------------------------------------------------------------------------
 # Shared config — all read schemas allow ORM model instances as input
 # ---------------------------------------------------------------------------
@@ -150,3 +149,23 @@ class WorkspaceTree(_ReadBase):
     slug: str
     name: str
     spaces: list[SpaceTreeItem]
+
+
+# ---------------------------------------------------------------------------
+# Search
+# ---------------------------------------------------------------------------
+
+class SearchResultItem(BaseModel):
+    page_id: UUID
+    title: str
+    snippet: str
+    collection_id: UUID
+    space_id: UUID
+    space_name: str
+    collection_name: str
+    rank: float
+
+
+class SearchResponse(BaseModel):
+    query: str
+    results: list[SearchResultItem]
