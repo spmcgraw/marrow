@@ -35,9 +35,14 @@ export function SearchDialog({ workspaceId }: Props) {
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [isMac, setIsMac] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    setIsMac(navigator.platform.toUpperCase().includes("MAC"));
+  }, []);
 
   // Global keyboard shortcut: Cmd+K / Ctrl+K
   useEffect(() => {
@@ -123,7 +128,7 @@ export function SearchDialog({ workspaceId }: Props) {
         <Search className="h-3.5 w-3.5" />
         <span className="flex-1 text-left">Search...</span>
         <kbd className="pointer-events-none hidden select-none items-center gap-0.5 rounded border bg-muted px-1 font-mono text-[10px] font-medium sm:flex">
-          <span className="text-xs">&#8984;</span>K
+          {isMac ? <span className="text-xs">&#8984;</span> : <span className="text-xs">Ctrl+</span>}K
         </kbd>
       </button>
 
