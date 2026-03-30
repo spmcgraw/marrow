@@ -169,3 +169,21 @@ class SearchResultItem(BaseModel):
 class SearchResponse(BaseModel):
     query: str
     results: list[SearchResultItem]
+
+
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
+
+
+class UserRead(_ReadBase):
+    id: UUID
+    email: str
+    name: str
+
+
+class AuthStatus(BaseModel):
+    authenticated: bool
+    user: UserRead | None = None
+    method: str  # "session", "api_key", or "anonymous"
+    oidc_enabled: bool

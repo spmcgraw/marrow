@@ -144,7 +144,7 @@ class TestMigrationCycle:
             conn.close()
 
     def test_downgrade_reverses_cleanly(self, db_url):
-        command.downgrade(_alembic_cfg(db_url), "-1")
+        command.downgrade(_alembic_cfg(db_url), "base")
 
         conn = psycopg2.connect(db_url)
         with conn.cursor() as cur:

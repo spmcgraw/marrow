@@ -95,3 +95,17 @@ export interface WorkspaceTree {
   name: string;
   spaces: SpaceTreeItem[];
 }
+
+// Auth
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+}
+
+export interface AuthStatus {
+  authenticated: boolean;
+  user: User | null;
+  method: string;
+  oidc_enabled: boolean;
+}

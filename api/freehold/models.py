@@ -164,3 +164,23 @@ class Attachment(Base):
     __table_args__ = (ForeignKeyConstraint(["page_id"], ["pages.id"], ondelete="CASCADE"),)
 
     page: Mapped["Page"] = relationship(back_populates="attachments")
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    oidc_issuer: Mapped[str] = mapped_column(Text, nullable=False)
+    oidc_subject: Mapped[str] = mapped_column(Text, nullable=False)
+    email: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    last_login_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (UniqueConstraint("oidc_issuer", "oidc_subject"),)

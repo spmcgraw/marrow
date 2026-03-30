@@ -7,6 +7,7 @@
 
 import type {
   Attachment,
+  AuthStatus,
   Collection,
   Page,
   Revision,
@@ -29,13 +30,29 @@ async function apiFetch<T>(
     ...(options.headers as Record<string, string>),
   };
 
+  // Server-side: forward the session cookie from the incoming request
+  if (typeof window === "undefined") {
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    const session = cookieStore.get("freehold_session");
+    if (session) {
+      headers["Cookie"] = `freehold_session=${session.value}`;
+    }
+  }
+
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers,
+    credentials: "include", // send cookies for cross-origin OIDC auth
     cache: "no-store", // always fetch fresh data — this is a wiki, not a CDN
   });
 
   if (!res.ok) {
+    // Client-side 401: redirect to OIDC login
+    if (res.status === 401 && typeof window !== "undefined") {
+      window.location.href = `${BASE_URL}/api/auth/login`;
+      return new Promise(() => {}); // page is navigating away
+    }
     const text = await res.text().catch(() => res.statusText);
     throw new Error(`API error ${res.status}: ${text}`);
   }
@@ -167,7 +184,7 @@ export async function uploadAttachment(
 
   const res = await fetch(
     `${BASE_URL}/api/collections/${collectionId}/pages/${pageId}/attachments`,
-    { method: "POST", body: form, headers }
+    { method: "POST", body: form, headers, credentials: "include" }
   );
 
   if (!res.ok) {
@@ -184,6 +201,18 @@ export function attachmentFileUrl(collectionId: string, pageId: string, attachme
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+export function getAuthStatus(): Promise<AuthStatus> {
+  return apiFetch("/api/auth/me");
+}
+
+export async function logout(): Promise<void> {
+  await apiFetch("/api/auth/logout", { method: "POST" });
+}
 
 /** Convert a display name to a URL-safe slug. */
 export function slugify(name: string): string {

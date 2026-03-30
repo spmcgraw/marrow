@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -26,12 +27,13 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { createCollection, createPage, createSpace, slugify } from "@/lib/api";
+import { createCollection, createPage, createSpace, logout, slugify } from "@/lib/api";
 import { SearchDialog } from "@/components/search-dialog";
-import type { CollectionTreeItem, SpaceTreeItem, WorkspaceTree } from "@/lib/types";
+import type { CollectionTreeItem, SpaceTreeItem, User, WorkspaceTree } from "@/lib/types";
 
 interface Props {
   tree: WorkspaceTree;
+  user?: User | null;
 }
 
 // Simple modal form used for Space, Collection, and Page creation.
@@ -218,7 +220,7 @@ function SpaceSection({
   );
 }
 
-export function AppSidebar({ tree }: Props) {
+export function AppSidebar({ tree, user }: Props) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -272,6 +274,27 @@ export function AppSidebar({ tree }: Props) {
           </p>
         )}
       </SidebarContent>
+
+      {user && (
+        <SidebarFooter className="border-t border-sidebar-border">
+          <div className="flex items-center justify-between px-2 py-1.5">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{user.name}</p>
+              <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={async () => {
+                await logout();
+                window.location.href = "/login";
+              }}
+            >
+              Sign out
+            </Button>
+          </div>
+        </SidebarFooter>
+      )}
     </Sidebar>
   );
 }

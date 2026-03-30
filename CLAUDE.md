@@ -21,7 +21,8 @@ Current status: **v0.1 MVP** — core hierarchy, append-only revisions, export/r
 - **Backend**: FastAPI (Python 3.11+), located in `api/`
 - **Database**: PostgreSQL 16 (docker-compose maps to port 5433)
 - **Migrations**: Alembic
-- **Search**: PostgreSQL full-text search planned for v0.1; Meilisearch/OpenSearch later
+- **Auth**: OIDC authentication (any IdP) with API key fallback — see `api/freehold/auth.py`
+- **Search**: PostgreSQL full-text search; Meilisearch/OpenSearch later
 - **Frontend**: Next.js 16 (React 19), located in `web/`
 - **Storage**: Pluggable adapter interface — local filesystem is the only current implementation
 - **CLI**: Typer (`freehold export` / `freehold restore`)
@@ -59,6 +60,14 @@ SECRET_KEY=changeme
 STORAGE_PATH=./storage       # resolves relative to api/ directory
 API_KEY=                     # optional; if set, enforces X-API-Key header on all routes
 CORS_ORIGINS=http://localhost:3000
+
+# OIDC Authentication (optional — omit OIDC_ISSUER to disable)
+# OIDC_ISSUER=https://accounts.google.com
+# OIDC_CLIENT_ID=
+# OIDC_CLIENT_SECRET=
+# OIDC_REDIRECT_URI=http://localhost:8000/api/auth/callback
+# FRONTEND_URL=http://localhost:3000
+# COOKIE_DOMAIN=localhost    # shared domain for session cookie (dev: localhost)
 ```
 
 **Frontend (`web/.env.local`)**:
@@ -66,6 +75,7 @@ CORS_ORIGINS=http://localhost:3000
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_API_KEY=         # must match API_KEY in backend .env if set
+NEXT_PUBLIC_OIDC_ENABLED=    # set to "true" when OIDC is configured on the backend
 ```
 
 ---
@@ -111,19 +121,22 @@ freehold/
 │   ├── alembic/
 │   │   └── versions/
 │   │       ├── 69d839126d73_create_core_schema.py
-│   │       └── d3981f696939_add_full_text_search.py
+│   │       ├── d3981f696939_add_full_text_search.py
+│   │       └── 35eb203afc65_add_users_table.py
 │   ├── freehold/                     # Main package
-│   │   ├── app.py                    # FastAPI app factory, CORS middleware
+│   │   ├── app.py                    # FastAPI app factory, CORS + session middleware
+│   │   ├── auth.py                   # OIDC config, session JWT helpers, cookie params
 │   │   ├── db.py                     # SQLAlchemy session management
-│   │   ├── dependencies.py           # FastAPI dependency providers (api key, db session, search)
-│   │   ├── models.py                 # SQLAlchemy ORM models
-│   │   ├── schemas.py                # Pydantic request/response schemas
+│   │   ├── dependencies.py           # FastAPI dependency providers (auth, db session, search)
+│   │   ├── models.py                 # SQLAlchemy ORM models (incl. User)
+│   │   ├── schemas.py                # Pydantic request/response schemas (incl. AuthStatus)
 │   │   ├── search.py                 # SearchBackend ABC + PostgresSearchBackend
 │   │   ├── storage.py                # StorageAdapter ABC + LocalFilesystemAdapter
 │   │   ├── export.py                 # Export workspace → zip bundle
 │   │   ├── restore.py                # Restore workspace ← zip bundle
 │   │   ├── cli.py                    # Typer CLI (export, restore commands)
 │   │   └── routers/
+│   │       ├── auth.py               # OIDC login/callback/me/logout (no auth required)
 │   │       ├── workspaces.py
 │   │       ├── spaces.py
 │   │       ├── collections.py
@@ -132,19 +145,23 @@ freehold/
 │   ├── tests/
 │   │   ├── test_models_smoke.py
 │   │   ├── test_migration_cycle.py
+│   │   ├── test_auth.py              # Auth dependency, JWT, and auth router tests
 │   │   ├── test_export.py
 │   │   ├── test_restore.py
 │   │   ├── test_round_trip.py        # Critical regression anchor
-│   │   └── test_search.py           # FTS trigger + search scoping tests
+│   │   └── test_search.py            # FTS trigger + search scoping tests
 │   └── storage/                      # Default local attachment storage (gitignored)
 │
 ├── web/                              # Next.js frontend
+│   ├── middleware.ts                  # Route protection (redirects to /login when OIDC enabled)
 │   ├── app/
 │   │   ├── page.tsx                  # Root → redirects to /workspaces
 │   │   ├── layout.tsx                # Root layout with theme provider
+│   │   ├── login/page.tsx            # SSO login page (shown when OIDC enabled)
+│   │   ├── auth/callback/page.tsx    # Post-OIDC callback landing page
 │   │   ├── workspaces/page.tsx       # Workspace list + creation
 │   │   └── w/[workspaceId]/
-│   │       ├── layout.tsx            # Workspace shell with sidebar
+│   │       ├── layout.tsx            # Workspace shell with sidebar + auth status
 │   │       ├── page.tsx              # Redirects to first space or empty state
 │   │       └── pages/[pageId]/
 │   │           └── page.tsx          # Page editor
@@ -189,6 +206,7 @@ workspaces → spaces → collections → pages → blocks (future)
 | pages | id, collection_id (FK cascade), slug (unique per collection), title, current_revision_id (deferred FK), search_vector (tsvector, GIN-indexed, trigger-managed) |
 | revisions | id, page_id (FK cascade), content (TEXT) — **immutable via PG trigger** |
 | attachments | id, page_id (FK cascade), filename, hash (SHA256), size_bytes |
+| users | id, oidc_issuer, oidc_subject (unique together), email, name, last_login_at |
 
 **Revision immutability**: A PL/pgSQL trigger (`revisions_immutable()`) raises an exception on any `UPDATE` or `DELETE` against the `revisions` table. This enforces the constraint at the database level, not just the application level.
 
@@ -196,11 +214,15 @@ workspaces → spaces → collections → pages → blocks (future)
 
 ### API Routes Summary
 
-All routes are prefixed with `/api`. Authentication is enforced via `X-API-Key` header when `API_KEY` env var is set.
+All routes are prefixed with `/api`. Authentication is enforced via session cookie (OIDC), `X-API-Key` header, or anonymous access (when neither is configured). Auth routes are unauthenticated.
 
 | Method | Path | Description |
 | --- | --- | --- |
 | GET | /health | Health check |
+| GET | /api/auth/login | Redirect to OIDC provider |
+| GET | /api/auth/callback | OIDC callback — exchanges code, sets session cookie |
+| GET | /api/auth/me | Current auth status and user info |
+| POST | /api/auth/logout | Clear session cookie |
 | GET/POST | /api/workspaces/ | List / create workspaces |
 | GET/DELETE | /api/workspaces/{id} | Get / delete workspace |
 | GET | /api/workspaces/{id}/tree | Full hierarchy (sidebar) |
@@ -244,6 +266,18 @@ freehold-export-{workspace-slug}-{timestamp}.zip
 └── links.json           # internal links, broken links, orphaned pages
 ```
 
+### Authentication
+
+Freehold supports three authentication methods, checked in priority order:
+
+1. **OIDC session cookie** (`freehold_session`): A JWT signed with `SECRET_KEY` (HS256), issued after successful OIDC login. Contains `sub` (user UUID), `email`, `name`, with 24h expiry.
+2. **API key** (`X-API-Key` header): Static key matching `API_KEY` env var. Used by CLI and scripts.
+3. **Anonymous**: When neither OIDC nor API key is configured, all requests are allowed (dev mode).
+
+**OIDC flow**: The backend is the OIDC Relying Party. `GET /api/auth/login` redirects to the IdP. `GET /api/auth/callback` exchanges the code, upserts the user in the `users` table, and sets an httpOnly session cookie. The `COOKIE_DOMAIN` env var controls the cookie domain (set to `localhost` for dev so the cookie is shared between `:3000` and `:8000`).
+
+**Key files**: `auth.py` (config, JWT helpers), `dependencies.py` (`verify_auth` + `AuthContext`), `routers/auth.py` (login/callback/me/logout).
+
 ### Frontend Patterns
 
 - **API client** (`lib/api.ts`): all server calls go through `apiFetch<T>()` which injects auth headers and handles errors
@@ -280,7 +314,7 @@ Tests in `api/tests/` are **integration tests** — they hit a real database. A 
 - Meilisearch upgrade for fuzzy/typo-tolerant search (PostgreSQL FTS is implemented)
 - S3-compatible storage adapter
 - Rich text / TipTap editor (currently plain Markdown textarea)
-- User authentication and permissions (API key is the only auth layer)
+- User permissions and workspace-level access control (OIDC auth is implemented but no per-user data scoping)
 - Audit log / audit_events table
 - Task management and integrations
 - Deployment docs (Docker image, K8s, systemd)
