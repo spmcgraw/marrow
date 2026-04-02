@@ -153,7 +153,7 @@ freehold/
 │   └── storage/                      # Default local attachment storage (gitignored)
 │
 ├── web/                              # Next.js frontend
-│   ├── middleware.ts                  # Route protection (redirects to /login when OIDC enabled)
+│   ├── proxy.ts                      # Route protection (redirects to /login when OIDC enabled)
 │   ├── app/
 │   │   ├── page.tsx                  # Root → redirects to /workspaces
 │   │   ├── layout.tsx                # Root layout with theme provider
