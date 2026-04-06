@@ -7,6 +7,7 @@ These models mirror the Alembic migration exactly, including:
 - attachments.hash NOT NULL
 """
 
+import enum
 import uuid
 from datetime import datetime
 
@@ -26,8 +27,14 @@ class Base(DeclarativeBase):
     pass
 
 
-class Workspace(Base):
-    __tablename__ = "workspaces"
+class OrgRole(str, enum.Enum):
+    OWNER = "owner"
+    EDITOR = "editor"
+    VIEWER = "viewer"
+
+
+class Organization(Base):
+    __tablename__ = "organizations"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
@@ -38,7 +45,61 @@ class Workspace(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
-    spaces: Mapped[list["Space"]] = relationship(back_populates="workspace")
+    memberships: Mapped[list["OrgMembership"]] = relationship(
+        back_populates="organization", passive_deletes=True
+    )
+    workspaces: Mapped[list["Workspace"]] = relationship(
+        back_populates="organization", passive_deletes=True
+    )
+
+
+class OrgMembership(Base):
+    __tablename__ = "org_memberships"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    org_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    email: Mapped[str] = mapped_column(Text, nullable=False)
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(["org_id"], ["organizations.id"], ondelete="CASCADE"),
+        ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+    )
+
+    organization: Mapped["Organization"] = relationship(back_populates="memberships")
+    user: Mapped["User | None"] = relationship(back_populates="memberships")
+
+
+class Workspace(Base):
+    __tablename__ = "workspaces"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    org_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    slug: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["org_id"],
+            ["organizations.id"],
+            name="fk_workspaces_org_id",
+            ondelete="CASCADE",
+        ),
+    )
+
+    organization: Mapped["Organization"] = relationship(back_populates="workspaces")
+    spaces: Mapped[list["Space"]] = relationship(back_populates="workspace", passive_deletes=True)
 
 
 class Space(Base):
@@ -60,7 +121,9 @@ class Space(Base):
     )
 
     workspace: Mapped["Workspace"] = relationship(back_populates="spaces")
-    collections: Mapped[list["Collection"]] = relationship(back_populates="space")
+    collections: Mapped[list["Collection"]] = relationship(
+        back_populates="space", passive_deletes=True
+    )
 
 
 class Collection(Base):
@@ -82,7 +145,7 @@ class Collection(Base):
     )
 
     space: Mapped["Space"] = relationship(back_populates="collections")
-    pages: Mapped[list["Page"]] = relationship(back_populates="collection")
+    pages: Mapped[list["Page"]] = relationship(back_populates="collection", passive_deletes=True)
 
 
 class Page(Base):
@@ -124,8 +187,11 @@ class Page(Base):
         back_populates="page",
         foreign_keys="[Revision.page_id]",
         order_by="Revision.created_at",
+        passive_deletes=True,
     )
-    attachments: Mapped[list["Attachment"]] = relationship(back_populates="page")
+    attachments: Mapped[list["Attachment"]] = relationship(
+        back_populates="page", passive_deletes=True
+    )
 
 
 class Revision(Base):
@@ -184,3 +250,5 @@ class User(Base):
     )
 
     __table_args__ = (UniqueConstraint("oidc_issuer", "oidc_subject"),)
+
+    memberships: Mapped[list["OrgMembership"]] = relationship(back_populates="user")

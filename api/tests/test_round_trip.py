@@ -13,14 +13,14 @@ import uuid
 
 import psycopg2
 import pytest
-from alembic import command
 from alembic.config import Config
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
+from alembic import command
 from freehold.export import export_workspace
-from freehold.models import Attachment, Collection, Page, Revision, Space, Workspace
+from freehold.models import Attachment, Collection, Organization, Page, Revision, Space, Workspace
 from freehold.restore import restore_workspace
 from freehold.storage import StorageAdapter
 
@@ -104,7 +104,11 @@ def test_export_restore_round_trip(db_url, tmp_path):
     original: dict = {}
 
     with Session(engine) as session:
-        ws = Workspace(slug="roundtrip-ws", name="Round-Trip Workspace")
+        org = Organization(slug="roundtrip-org", name="Round-Trip Org")
+        session.add(org)
+        session.flush()
+
+        ws = Workspace(org_id=org.id, slug="roundtrip-ws", name="Round-Trip Workspace")
         session.add(ws)
         session.flush()
 
@@ -150,8 +154,14 @@ def test_export_restore_round_trip(db_url, tmp_path):
         export_storage.write(str(att.id), "diagram.png", att_data)
 
         # Capture ground truth before committing (IDs are assigned).
+        original["organization"] = {
+            "id": str(org.id),
+            "slug": org.slug,
+            "name": org.name,
+        }
         original["workspace"] = {
             "id": str(ws.id),
+            "org_id": str(ws.org_id),
             "slug": ws.slug,
             "name": ws.name,
         }
@@ -206,7 +216,7 @@ def test_export_restore_round_trip(db_url, tmp_path):
     # the row-level immutability trigger on the revisions table.
     # ------------------------------------------------------------------
     with engine.connect() as conn:
-        conn.execute(text("TRUNCATE workspaces CASCADE"))
+        conn.execute(text("TRUNCATE organizations, workspaces CASCADE"))
         conn.commit()
 
     # ------------------------------------------------------------------
@@ -226,9 +236,16 @@ def test_export_restore_round_trip(db_url, tmp_path):
     with Session(engine) as session:
         ws = session.query(Workspace).filter_by(slug="roundtrip-ws").one()
 
+        # Organization identity
+        restored_org = session.get(Organization, uuid.UUID(original["organization"]["id"]))
+        assert restored_org is not None, "Organization missing after restore"
+        assert restored_org.slug == original["organization"]["slug"]
+        assert restored_org.name == original["organization"]["name"]
+
         # Workspace identity
         assert str(ws.id) == original["workspace"]["id"]
         assert ws.name == original["workspace"]["name"]
+        assert str(ws.org_id) == original["workspace"]["org_id"]
 
         # Space / collection structure
         assert len(ws.spaces) == 1

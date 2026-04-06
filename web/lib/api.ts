@@ -9,6 +9,8 @@ import type {
   Attachment,
   AuthStatus,
   Collection,
+  Organization,
+  OrgMembership,
   Page,
   Revision,
   SearchResponse,
@@ -212,6 +214,57 @@ export function getAuthStatus(): Promise<AuthStatus> {
 
 export async function logout(): Promise<void> {
   await apiFetch("/api/auth/logout", { method: "POST" });
+}
+
+// ---------------------------------------------------------------------------
+// Organizations
+// ---------------------------------------------------------------------------
+
+export function listOrgs(): Promise<Organization[]> {
+  return apiFetch("/api/orgs");
+}
+
+export function createOrg(slug: string, name: string): Promise<Organization> {
+  return apiFetch("/api/orgs", {
+    method: "POST",
+    body: JSON.stringify({ slug, name }),
+  });
+}
+
+export function getOrg(orgId: string): Promise<Organization> {
+  return apiFetch(`/api/orgs/${orgId}`);
+}
+
+export function listOrgMembers(orgId: string): Promise<OrgMembership[]> {
+  return apiFetch(`/api/orgs/${orgId}/members`);
+}
+
+export function inviteMember(
+  orgId: string,
+  email: string,
+  role: string
+): Promise<OrgMembership> {
+  return apiFetch(`/api/orgs/${orgId}/members`, {
+    method: "POST",
+    body: JSON.stringify({ email, role }),
+  });
+}
+
+export function updateMemberRole(
+  orgId: string,
+  membershipId: string,
+  role: string
+): Promise<OrgMembership> {
+  return apiFetch(`/api/orgs/${orgId}/members/${membershipId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+}
+
+export function removeMember(orgId: string, membershipId: string): Promise<void> {
+  return apiFetch(`/api/orgs/${orgId}/members/${membershipId}`, {
+    method: "DELETE",
+  });
 }
 
 /** Convert a display name to a URL-safe slug. */

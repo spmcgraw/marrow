@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
 from alembic import command
-from freehold.models import Collection, Page, Revision, Space, Workspace
+from freehold.models import Collection, Organization, Page, Revision, Space, Workspace
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://freehold:freehold@localhost:5433/freehold")
 
@@ -75,7 +75,10 @@ def db(engine):
 
 
 def _seed_workspace(db: Session) -> tuple[Workspace, Space, Collection]:
-    ws = Workspace(slug=f"ws-{uuid.uuid4().hex[:6]}", name="Test Workspace")
+    org = Organization(slug=f"org-{uuid.uuid4().hex[:6]}", name="Test Org")
+    db.add(org)
+    db.flush()
+    ws = Workspace(org_id=org.id, slug=f"ws-{uuid.uuid4().hex[:6]}", name="Test Workspace")
     db.add(ws)
     db.flush()
     space = Space(workspace_id=ws.id, slug="main", name="Main")
@@ -108,7 +111,10 @@ def test_search_vector_populated_on_revision_insert(db):
     """Inserting a revision should populate the page's search_vector."""
     ws, _, col = _seed_workspace(db)
     page = _create_page(
-        db, col, "test-page", "Quantum Computing",
+        db,
+        col,
+        "test-page",
+        "Quantum Computing",
         "An introduction to qubits and superposition",
     )
 

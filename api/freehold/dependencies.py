@@ -26,6 +26,7 @@ load_dotenv()
 # Database
 # ---------------------------------------------------------------------------
 
+
 def _require_database_url() -> str:
     url = os.getenv("DATABASE_URL")
     if not url:

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, FilePlus, FolderPlus, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, FilePlus, FolderPlus, Plus, Settings } from "lucide-react";
 import { toast } from "sonner";
 import {
   Sidebar,
@@ -239,6 +239,14 @@ export function AppSidebar({ tree, user }: Props) {
         </div>
         <div className="flex items-center justify-between px-2 pb-1.5 group">
           <span className="text-xs font-medium text-muted-foreground">{tree.name}</span>
+          <div className="flex items-center gap-1">
+            <a
+              href={`/orgs/${tree.org_id}/settings`}
+              className="hidden group-hover:flex items-center text-muted-foreground hover:text-foreground"
+              title="Organization settings"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </a>
           <CreateDialog
             trigger={
               <span className="hidden group-hover:flex items-center text-muted-foreground hover:text-foreground cursor-pointer" title="New space">
@@ -252,6 +260,7 @@ export function AppSidebar({ tree, user }: Props) {
               refresh();
             }}
           />
+          </div>
         </div>
         <div className="px-2 pb-2">
           <SearchDialog workspaceId={tree.id} />

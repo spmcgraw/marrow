@@ -57,6 +57,7 @@ def _make_bundle(
     ws_id: uuid.UUID | None = None,
     ws_slug: str = "test-ws",
     ws_name: str = "Test Workspace",
+    org_id: uuid.UUID | None = None,
     with_attachment: bool = False,
     attachment_data: bytes = b"attachment bytes",
     corrupt_attachment: bool = False,
@@ -68,6 +69,7 @@ def _make_bundle(
     now = datetime.now(timezone.utc).isoformat()
 
     ws_id = ws_id or uuid.uuid4()
+    org_id = org_id or uuid.uuid4()
     space_id = uuid.uuid4()
     col_id = uuid.uuid4()
     page_id = uuid.uuid4()
@@ -79,7 +81,19 @@ def _make_bundle(
     manifest: dict = {
         "schema_version": schema_version,
         "export_timestamp": now,
-        "workspace": {"id": str(ws_id), "slug": ws_slug, "name": ws_name, "created_at": now},
+        "organization": {
+            "id": str(org_id),
+            "slug": f"{ws_slug}-org",
+            "name": f"{ws_name} Org",
+            "created_at": now,
+        },
+        "workspace": {
+            "id": str(ws_id),
+            "org_id": str(org_id),
+            "slug": ws_slug,
+            "name": ws_name,
+            "created_at": now,
+        },
         "spaces": [
             {
                 "id": str(space_id),

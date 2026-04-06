@@ -10,8 +10,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..dependencies import get_db
-from ..models import Page, Revision
+from ..dependencies import AuthContext, get_db
+from ..models import OrgRole, Page, Revision
+from ..rbac import require_page_role
 from ..schemas import (
     PageReadWithContent,
     PageUpdate,
@@ -43,12 +44,21 @@ def _page_with_content(page: Page) -> PageReadWithContent:
 
 
 @router.get("/{page_id}", response_model=PageReadWithContent)
-def get_page(page_id: UUID, db: Session = Depends(get_db)):
+def get_page(
+    page_id: UUID,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_page_role(OrgRole.VIEWER)),
+):
     return _page_with_content(_get_page_or_404(page_id, db))
 
 
 @router.patch("/{page_id}", response_model=PageReadWithContent)
-def update_page(page_id: UUID, body: PageUpdate, db: Session = Depends(get_db)):
+def update_page(
+    page_id: UUID,
+    body: PageUpdate,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_page_role(OrgRole.EDITOR)),
+):
     """Append a new revision when content changes — never update in place."""
     page = _get_page_or_404(page_id, db)
 
@@ -67,18 +77,22 @@ def update_page(page_id: UUID, body: PageUpdate, db: Session = Depends(get_db)):
 
 
 @router.get("/{page_id}/revisions", response_model=list[RevisionRead])
-def list_revisions(page_id: UUID, db: Session = Depends(get_db)):
+def list_revisions(
+    page_id: UUID,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_page_role(OrgRole.VIEWER)),
+):
     _get_page_or_404(page_id, db)
-    return (
-        db.query(Revision)
-        .filter_by(page_id=page_id)
-        .order_by(Revision.created_at.desc())
-        .all()
-    )
+    return db.query(Revision).filter_by(page_id=page_id).order_by(Revision.created_at.desc()).all()
 
 
 @router.get("/{page_id}/revisions/{revision_id}", response_model=RevisionReadWithContent)
-def get_revision(page_id: UUID, revision_id: UUID, db: Session = Depends(get_db)):
+def get_revision(
+    page_id: UUID,
+    revision_id: UUID,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_page_role(OrgRole.VIEWER)),
+):
     _get_page_or_404(page_id, db)
     rev = db.get(Revision, revision_id)
     if rev is None or rev.page_id != page_id:

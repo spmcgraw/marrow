@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from .models import Attachment, Page, Workspace
 from .storage import StorageAdapter
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 
 
 def _sha256(data: bytes) -> str:
@@ -85,11 +85,19 @@ def _build_manifest(
         for rev in page.revisions
     ]
 
+    org = workspace.organization
     return {
         "schema_version": SCHEMA_VERSION,
         "export_timestamp": export_timestamp,
+        "organization": {
+            "id": str(org.id),
+            "slug": org.slug,
+            "name": org.name,
+            "created_at": org.created_at.isoformat(),
+        },
         "workspace": {
             "id": str(workspace.id),
+            "org_id": str(workspace.org_id),
             "slug": workspace.slug,
             "name": workspace.name,
             "created_at": workspace.created_at.isoformat(),

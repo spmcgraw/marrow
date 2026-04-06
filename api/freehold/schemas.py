@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict
 # Shared config — all read schemas allow ORM model instances as input
 # ---------------------------------------------------------------------------
 
+
 class _ReadBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -17,13 +18,16 @@ class _ReadBase(BaseModel):
 # Workspace
 # ---------------------------------------------------------------------------
 
+
 class WorkspaceCreate(BaseModel):
     slug: str
     name: str
+    org_id: UUID | None = None  # if None, uses personal org
 
 
 class WorkspaceRead(_ReadBase):
     id: UUID
+    org_id: UUID
     slug: str
     name: str
     created_at: datetime
@@ -32,6 +36,7 @@ class WorkspaceRead(_ReadBase):
 # ---------------------------------------------------------------------------
 # Space
 # ---------------------------------------------------------------------------
+
 
 class SpaceCreate(BaseModel):
     slug: str
@@ -50,6 +55,7 @@ class SpaceRead(_ReadBase):
 # Collection
 # ---------------------------------------------------------------------------
 
+
 class CollectionCreate(BaseModel):
     slug: str
     name: str
@@ -66,6 +72,7 @@ class CollectionRead(_ReadBase):
 # ---------------------------------------------------------------------------
 # Page
 # ---------------------------------------------------------------------------
+
 
 class PageCreate(BaseModel):
     slug: str
@@ -95,6 +102,7 @@ class PageReadWithContent(PageRead):
 # Revision
 # ---------------------------------------------------------------------------
 
+
 class RevisionRead(_ReadBase):
     id: UUID
     page_id: UUID
@@ -109,6 +117,7 @@ class RevisionReadWithContent(RevisionRead):
 # Attachment
 # ---------------------------------------------------------------------------
 
+
 class AttachmentRead(_ReadBase):
     id: UUID
     page_id: UUID
@@ -121,6 +130,7 @@ class AttachmentRead(_ReadBase):
 # ---------------------------------------------------------------------------
 # Workspace tree (nested, for sidebar)
 # ---------------------------------------------------------------------------
+
 
 class PageTreeItem(_ReadBase):
     id: UUID
@@ -146,6 +156,7 @@ class SpaceTreeItem(_ReadBase):
 
 class WorkspaceTree(_ReadBase):
     id: UUID
+    org_id: UUID
     slug: str
     name: str
     spaces: list[SpaceTreeItem]
@@ -154,6 +165,7 @@ class WorkspaceTree(_ReadBase):
 # ---------------------------------------------------------------------------
 # Search
 # ---------------------------------------------------------------------------
+
 
 class SearchResultItem(BaseModel):
     page_id: UUID
@@ -169,6 +181,46 @@ class SearchResultItem(BaseModel):
 class SearchResponse(BaseModel):
     query: str
     results: list[SearchResultItem]
+
+
+# ---------------------------------------------------------------------------
+# Organization
+# ---------------------------------------------------------------------------
+
+
+class OrganizationCreate(BaseModel):
+    slug: str
+    name: str
+
+
+class OrganizationRead(_ReadBase):
+    id: UUID
+    slug: str
+    name: str
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Org Membership
+# ---------------------------------------------------------------------------
+
+
+class OrgMembershipCreate(BaseModel):
+    email: str
+    role: str  # "owner" | "editor" | "viewer"
+
+
+class OrgMembershipRead(_ReadBase):
+    id: UUID
+    org_id: UUID
+    user_id: UUID | None
+    email: str
+    role: str
+    created_at: datetime
+
+
+class OrgMembershipUpdate(BaseModel):
+    role: str
 
 
 # ---------------------------------------------------------------------------

@@ -8,8 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..dependencies import get_db, get_storage
-from ..models import Attachment, Collection, Page, Revision
+from ..dependencies import AuthContext, get_db, get_storage
+from ..models import Attachment, Collection, OrgRole, Page, Revision
+from ..rbac import require_collection_role
 from ..schemas import (
     AttachmentRead,
     PageCreate,
@@ -57,19 +58,24 @@ def _page_with_content(page: Page) -> PageReadWithContent:
 
 
 @router.get("", response_model=list[PageReadWithContent])
-def list_pages(collection_id: UUID, db: Session = Depends(get_db)):
+def list_pages(
+    collection_id: UUID,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_collection_role(OrgRole.VIEWER)),
+):
     _get_collection_or_404(collection_id, db)
     pages = db.query(Page).filter_by(collection_id=collection_id).order_by(Page.created_at).all()
     return [_page_with_content(p) for p in pages]
 
 
 @router.post("", response_model=PageReadWithContent, status_code=201)
-def create_page(collection_id: UUID, body: PageCreate, db: Session = Depends(get_db)):
-    """Create a page and its first revision in one transaction.
-
-    The deferred FK (pages.current_revision_id → revisions.id) lets us
-    insert both rows before wiring up the pointer — same pattern as restore.py.
-    """
+def create_page(
+    collection_id: UUID,
+    body: PageCreate,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_collection_role(OrgRole.EDITOR)),
+):
+    """Create a page and its first revision in one transaction."""
     _get_collection_or_404(collection_id, db)
 
     page = Page(
@@ -79,13 +85,13 @@ def create_page(collection_id: UUID, body: PageCreate, db: Session = Depends(get
         current_revision_id=None,
     )
     db.add(page)
-    db.flush()  # get page.id before inserting revision
+    db.flush()
 
     rev = Revision(page_id=page.id, content=body.content)
     db.add(rev)
-    db.flush()  # get rev.id
+    db.flush()
 
-    page.current_revision_id = rev.id  # deferred FK checked at commit
+    page.current_revision_id = rev.id
 
     try:
         db.commit()
@@ -100,14 +106,23 @@ def create_page(collection_id: UUID, body: PageCreate, db: Session = Depends(get
 
 
 @router.get("/{page_id}", response_model=PageReadWithContent)
-def get_page(collection_id: UUID, page_id: UUID, db: Session = Depends(get_db)):
+def get_page(
+    collection_id: UUID,
+    page_id: UUID,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_collection_role(OrgRole.VIEWER)),
+):
     page = _get_page_or_404(collection_id, page_id, db)
     return _page_with_content(page)
 
 
 @router.patch("/{page_id}", response_model=PageReadWithContent)
 def update_page(
-    collection_id: UUID, page_id: UUID, body: PageUpdate, db: Session = Depends(get_db)
+    collection_id: UUID,
+    page_id: UUID,
+    body: PageUpdate,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_collection_role(OrgRole.EDITOR)),
 ):
     """Update a page's title and/or content.
 
@@ -131,7 +146,12 @@ def update_page(
 
 
 @router.delete("/{page_id}", status_code=204)
-def delete_page(collection_id: UUID, page_id: UUID, db: Session = Depends(get_db)):
+def delete_page(
+    collection_id: UUID,
+    page_id: UUID,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_collection_role(OrgRole.OWNER)),
+):
     page = _get_page_or_404(collection_id, page_id, db)
     db.delete(page)
     db.commit()
@@ -143,19 +163,23 @@ def delete_page(collection_id: UUID, page_id: UUID, db: Session = Depends(get_db
 
 
 @router.get("/{page_id}/revisions", response_model=list[RevisionRead])
-def list_revisions(collection_id: UUID, page_id: UUID, db: Session = Depends(get_db)):
+def list_revisions(
+    collection_id: UUID,
+    page_id: UUID,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_collection_role(OrgRole.VIEWER)),
+):
     _get_page_or_404(collection_id, page_id, db)
-    return (
-        db.query(Revision)
-        .filter_by(page_id=page_id)
-        .order_by(Revision.created_at.desc())
-        .all()
-    )
+    return db.query(Revision).filter_by(page_id=page_id).order_by(Revision.created_at.desc()).all()
 
 
 @router.get("/{page_id}/revisions/{revision_id}", response_model=RevisionReadWithContent)
 def get_revision(
-    collection_id: UUID, page_id: UUID, revision_id: UUID, db: Session = Depends(get_db)
+    collection_id: UUID,
+    page_id: UUID,
+    revision_id: UUID,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_collection_role(OrgRole.VIEWER)),
 ):
     _get_page_or_404(collection_id, page_id, db)
     rev = db.get(Revision, revision_id)
@@ -170,14 +194,14 @@ def get_revision(
 
 
 @router.get("/{page_id}/attachments", response_model=list[AttachmentRead])
-def list_attachments(collection_id: UUID, page_id: UUID, db: Session = Depends(get_db)):
+def list_attachments(
+    collection_id: UUID,
+    page_id: UUID,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_collection_role(OrgRole.VIEWER)),
+):
     _get_page_or_404(collection_id, page_id, db)
-    return (
-        db.query(Attachment)
-        .filter_by(page_id=page_id)
-        .order_by(Attachment.created_at)
-        .all()
-    )
+    return db.query(Attachment).filter_by(page_id=page_id).order_by(Attachment.created_at).all()
 
 
 @router.post("/{page_id}/attachments", response_model=AttachmentRead, status_code=201)
@@ -187,23 +211,16 @@ async def upload_attachment(
     file: UploadFile,
     db: Session = Depends(get_db),
     storage: StorageAdapter = Depends(get_storage),
+    auth: AuthContext = Depends(require_collection_role(OrgRole.EDITOR)),
 ):
-    """Upload a file attachment.
-
-    Hash is computed from the raw bytes before writing to storage or DB.
-    Storage is written first; if the DB commit fails the orphaned file is
-    harmless. If storage write fails, the DB is never touched.
-    """
+    """Upload a file attachment."""
     _get_page_or_404(collection_id, page_id, db)
 
     data = await file.read()
     sha256 = hashlib.sha256(data).hexdigest()
     filename = file.filename or "upload"
 
-    # Generate the attachment ID here so we can pass it to storage before
-    # the DB record is committed (same pattern as restore.py).
     att_id = uuid.uuid4()
-
     storage.write(str(att_id), filename, data)
 
     att = Attachment(
@@ -226,6 +243,7 @@ def download_attachment(
     attachment_id: UUID,
     db: Session = Depends(get_db),
     storage: StorageAdapter = Depends(get_storage),
+    auth: AuthContext = Depends(require_collection_role(OrgRole.VIEWER)),
 ):
     _get_page_or_404(collection_id, page_id, db)
     att = db.get(Attachment, attachment_id)

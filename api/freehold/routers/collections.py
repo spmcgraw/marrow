@@ -6,8 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..dependencies import get_db
-from ..models import Collection, Space
+from ..dependencies import AuthContext, get_db
+from ..models import Collection, OrgRole, Space
+from ..rbac import require_space_role
 from ..schemas import CollectionCreate, CollectionRead
 
 router = APIRouter(prefix="/api/spaces/{space_id}/collections", tags=["collections"])
@@ -21,18 +22,22 @@ def _get_space_or_404(space_id: UUID, db: Session) -> Space:
 
 
 @router.get("", response_model=list[CollectionRead])
-def list_collections(space_id: UUID, db: Session = Depends(get_db)):
+def list_collections(
+    space_id: UUID,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_space_role(OrgRole.VIEWER)),
+):
     _get_space_or_404(space_id, db)
-    return (
-        db.query(Collection)
-        .filter_by(space_id=space_id)
-        .order_by(Collection.created_at)
-        .all()
-    )
+    return db.query(Collection).filter_by(space_id=space_id).order_by(Collection.created_at).all()
 
 
 @router.post("", response_model=CollectionRead, status_code=201)
-def create_collection(space_id: UUID, body: CollectionCreate, db: Session = Depends(get_db)):
+def create_collection(
+    space_id: UUID,
+    body: CollectionCreate,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_space_role(OrgRole.EDITOR)),
+):
     _get_space_or_404(space_id, db)
     col = Collection(space_id=space_id, slug=body.slug, name=body.name)
     db.add(col)
@@ -49,7 +54,12 @@ def create_collection(space_id: UUID, body: CollectionCreate, db: Session = Depe
 
 
 @router.get("/{collection_id}", response_model=CollectionRead)
-def get_collection(space_id: UUID, collection_id: UUID, db: Session = Depends(get_db)):
+def get_collection(
+    space_id: UUID,
+    collection_id: UUID,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_space_role(OrgRole.VIEWER)),
+):
     _get_space_or_404(space_id, db)
     col = db.get(Collection, collection_id)
     if col is None or col.space_id != space_id:
@@ -58,7 +68,12 @@ def get_collection(space_id: UUID, collection_id: UUID, db: Session = Depends(ge
 
 
 @router.delete("/{collection_id}", status_code=204)
-def delete_collection(space_id: UUID, collection_id: UUID, db: Session = Depends(get_db)):
+def delete_collection(
+    space_id: UUID,
+    collection_id: UUID,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_space_role(OrgRole.OWNER)),
+):
     _get_space_or_404(space_id, db)
     col = db.get(Collection, collection_id)
     if col is None or col.space_id != space_id:

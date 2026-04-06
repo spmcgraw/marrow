@@ -122,12 +122,14 @@ freehold/
 │   │   └── versions/
 │   │       ├── 69d839126d73_create_core_schema.py
 │   │       ├── d3981f696939_add_full_text_search.py
-│   │       └── 35eb203afc65_add_users_table.py
+│   │       ├── 35eb203afc65_add_users_table.py
+│   │       └── 0999ffe7b838_add_organizations_and_rbac.py
 │   ├── freehold/                     # Main package
 │   │   ├── app.py                    # FastAPI app factory, CORS + session middleware
 │   │   ├── auth.py                   # OIDC config, session JWT helpers, cookie params
 │   │   ├── db.py                     # SQLAlchemy session management
 │   │   ├── dependencies.py           # FastAPI dependency providers (auth, db session, search)
+│   │   ├── rbac.py                   # Role-based access control dependency factories
 │   │   ├── models.py                 # SQLAlchemy ORM models (incl. User)
 │   │   ├── schemas.py                # Pydantic request/response schemas (incl. AuthStatus)
 │   │   ├── search.py                 # SearchBackend ABC + PostgresSearchBackend
@@ -136,7 +138,8 @@ freehold/
 │   │   ├── restore.py                # Restore workspace ← zip bundle
 │   │   ├── cli.py                    # Typer CLI (export, restore commands)
 │   │   └── routers/
-│   │       ├── auth.py               # OIDC login/callback/me/logout (no auth required)
+│   │       ├── auth.py               # OIDC login/callback/me/logout + personal org creation
+│   │       ├── organizations.py      # Org CRUD, member management (invite, role, remove)
 │   │       ├── workspaces.py
 │   │       ├── spaces.py
 │   │       ├── collections.py
@@ -146,6 +149,7 @@ freehold/
 │   │   ├── test_models_smoke.py
 │   │   ├── test_migration_cycle.py
 │   │   ├── test_auth.py              # Auth dependency, JWT, and auth router tests
+│   │   ├── test_rbac.py              # Role enforcement matrix (owner/editor/viewer × CRUD)
 │   │   ├── test_export.py
 │   │   ├── test_restore.py
 │   │   ├── test_round_trip.py        # Critical regression anchor
@@ -159,6 +163,7 @@ freehold/
 │   │   ├── layout.tsx                # Root layout with theme provider
 │   │   ├── login/page.tsx            # SSO login page (shown when OIDC enabled)
 │   │   ├── auth/callback/page.tsx    # Post-OIDC callback landing page
+│   │   ├── orgs/[orgId]/settings/page.tsx  # Org member management UI
 │   │   ├── workspaces/page.tsx       # Workspace list + creation
 │   │   └── w/[workspaceId]/
 │   │       ├── layout.tsx            # Workspace shell with sidebar + auth status
@@ -189,18 +194,21 @@ freehold/
 ### Data Model
 
 ```text
-workspaces → spaces → collections → pages → blocks (future)
-                                          → attachments
-                                 → revisions  (append-only, every save)
-                       audit_events (future)
-                       tasks / task_integrations (future)
+organizations → org_memberships (user roles: owner/editor/viewer)
+             → workspaces → spaces → collections → pages → blocks (future)
+                                                         → attachments
+                                                → revisions  (append-only, every save)
+                              audit_events (future)
+                              tasks / task_integrations (future)
 ```
 
 **Tables** (all use UUIDs, timezone-aware timestamps):
 
 | Table | Key columns |
 | --- | --- |
-| workspaces | id, slug (unique), name |
+| organizations | id, slug (unique), name |
+| org_memberships | id, org_id (FK), user_id (FK, nullable for pending), email, role (owner/editor/viewer) |
+| workspaces | id, org_id (FK), slug (unique), name |
 | spaces | id, workspace_id (FK cascade), slug (unique per workspace), name |
 | collections | id, space_id (FK cascade), slug (unique per space), name |
 | pages | id, collection_id (FK cascade), slug (unique per collection), title, current_revision_id (deferred FK), search_vector (tsvector, GIN-indexed, trigger-managed) |
@@ -208,7 +216,7 @@ workspaces → spaces → collections → pages → blocks (future)
 | attachments | id, page_id (FK cascade), filename, hash (SHA256), size_bytes |
 | users | id, oidc_issuer, oidc_subject (unique together), email, name, last_login_at |
 
-**Revision immutability**: A PL/pgSQL trigger (`revisions_immutable()`) raises an exception on any `UPDATE` or `DELETE` against the `revisions` table. This enforces the constraint at the database level, not just the application level.
+**Revision immutability**: A PL/pgSQL trigger (`revisions_immutable()`) raises an exception on any `UPDATE` against the `revisions` table. This enforces the append-only constraint at the database level. `DELETE` is allowed via FK CASCADE (e.g., when a page or workspace is deleted).
 
 **Deferred FK**: `pages.current_revision_id → revisions.id` is a deferred constraint, allowing page and first revision to be created in a single transaction.
 
@@ -216,30 +224,36 @@ workspaces → spaces → collections → pages → blocks (future)
 
 All routes are prefixed with `/api`. Authentication is enforced via session cookie (OIDC), `X-API-Key` header, or anonymous access (when neither is configured). Auth routes are unauthenticated.
 
-| Method | Path | Description |
-| --- | --- | --- |
-| GET | /health | Health check |
-| GET | /api/auth/login | Redirect to OIDC provider |
-| GET | /api/auth/callback | OIDC callback — exchanges code, sets session cookie |
-| GET | /api/auth/me | Current auth status and user info |
-| POST | /api/auth/logout | Clear session cookie |
-| GET/POST | /api/workspaces/ | List / create workspaces |
-| GET/DELETE | /api/workspaces/{id} | Get / delete workspace |
-| GET | /api/workspaces/{id}/tree | Full hierarchy (sidebar) |
-| GET | /api/workspaces/{id}/search?q= | Full-text search across workspace pages |
-| GET/POST | /api/workspaces/{id}/spaces/ | List / create spaces |
-| GET/DELETE | /api/workspaces/{id}/spaces/{sid} | Get / delete space |
-| GET/POST | /api/spaces/{sid}/collections/ | List / create collections |
-| GET/DELETE | /api/spaces/{sid}/collections/{cid} | Get / delete collection |
-| GET/POST | /api/collections/{cid}/pages/ | List / create pages |
-| GET/PATCH/DELETE | /api/collections/{cid}/pages/{pid} | Get / update / delete page |
-| GET | /api/collections/{cid}/pages/{pid}/revisions | List revisions |
-| GET | /api/collections/{cid}/pages/{pid}/revisions/{rid} | Single revision |
-| GET/POST | /api/collections/{cid}/pages/{pid}/attachments | List / upload attachments |
-| GET | /api/collections/{cid}/pages/{pid}/attachments/{aid}/file | Download attachment |
-| GET/PATCH | /api/pages/{pid} | Global page get / update (no collection_id needed) |
-| GET | /api/pages/{pid}/revisions | Global revision list |
-| GET | /api/pages/{pid}/revisions/{rid} | Global single revision |
+| Method | Path | Description | Min Role |
+| --- | --- | --- | --- |
+| GET | /health | Health check | — |
+| GET | /api/auth/login | Redirect to OIDC provider | — |
+| GET | /api/auth/callback | OIDC callback — exchanges code, sets session cookie, claims pending memberships | — |
+| GET | /api/auth/me | Current auth status and user info | — |
+| POST | /api/auth/logout | Clear session cookie | — |
+| GET/POST | /api/orgs | List user's orgs / create org | session |
+| GET | /api/orgs/{oid} | Get org details | viewer |
+| GET | /api/orgs/{oid}/members | List members (incl. pending) | viewer |
+| POST | /api/orgs/{oid}/members | Invite member by email | owner |
+| PATCH | /api/orgs/{oid}/members/{mid} | Change member role | owner |
+| DELETE | /api/orgs/{oid}/members/{mid} | Remove member | owner |
+| GET/POST | /api/workspaces/ | List / create workspaces | viewer/editor |
+| GET/DELETE | /api/workspaces/{id} | Get / delete workspace | viewer/owner |
+| GET | /api/workspaces/{id}/tree | Full hierarchy (sidebar) | viewer |
+| GET | /api/workspaces/{id}/search?q= | Full-text search across workspace pages | viewer |
+| GET/POST | /api/workspaces/{id}/spaces/ | List / create spaces | viewer/editor |
+| GET/DELETE | /api/workspaces/{id}/spaces/{sid} | Get / delete space | viewer/owner |
+| GET/POST | /api/spaces/{sid}/collections/ | List / create collections | viewer/editor |
+| GET/DELETE | /api/spaces/{sid}/collections/{cid} | Get / delete collection | viewer/owner |
+| GET/POST | /api/collections/{cid}/pages/ | List / create pages | viewer/editor |
+| GET/PATCH/DELETE | /api/collections/{cid}/pages/{pid} | Get / update / delete page | viewer/editor/owner |
+| GET | /api/collections/{cid}/pages/{pid}/revisions | List revisions | viewer |
+| GET | /api/collections/{cid}/pages/{pid}/revisions/{rid} | Single revision | viewer |
+| GET/POST | /api/collections/{cid}/pages/{pid}/attachments | List / upload attachments | viewer/editor |
+| GET | /api/collections/{cid}/pages/{pid}/attachments/{aid}/file | Download attachment | viewer |
+| GET/PATCH | /api/pages/{pid} | Global page get / update (no collection_id needed) | viewer/editor |
+| GET | /api/pages/{pid}/revisions | Global revision list | viewer |
+| GET | /api/pages/{pid}/revisions/{rid} | Global single revision | viewer |
 
 ### Storage Adapter Interface
 
@@ -255,7 +269,7 @@ class StorageAdapter(ABC):
 
 ```
 freehold-export-{workspace-slug}-{timestamp}.zip
-├── manifest.json        # workspace metadata, all entity IDs, schema version
+├── manifest.json        # workspace + org metadata, all entity IDs, schema version (v2)
 ├── pages/
 │   └── {page-id}.md     # current content of each page
 ├── revisions/
@@ -271,12 +285,14 @@ freehold-export-{workspace-slug}-{timestamp}.zip
 Freehold supports three authentication methods, checked in priority order:
 
 1. **OIDC session cookie** (`freehold_session`): A JWT signed with `SECRET_KEY` (HS256), issued after successful OIDC login. Contains `sub` (user UUID), `email`, `name`, with 24h expiry.
-2. **API key** (`X-API-Key` header): Static key matching `API_KEY` env var. Used by CLI and scripts.
-3. **Anonymous**: When neither OIDC nor API key is configured, all requests are allowed (dev mode).
+2. **API key** (`X-API-Key` header): Static key matching `API_KEY` env var. Used by CLI and scripts. **Bypasses all RBAC checks** (superuser equivalent).
+3. **Anonymous**: When neither OIDC nor API key is configured, all requests are allowed (dev mode). **Bypasses all RBAC checks**.
 
-**OIDC flow**: The backend is the OIDC Relying Party. `GET /api/auth/login` redirects to the IdP. `GET /api/auth/callback` exchanges the code, upserts the user in the `users` table, and sets an httpOnly session cookie. The `COOKIE_DOMAIN` env var controls the cookie domain (set to `localhost` for dev so the cookie is shared between `:3000` and `:8000`).
+**OIDC flow**: The backend is the OIDC Relying Party. `GET /api/auth/login` redirects to the IdP. `GET /api/auth/callback` exchanges the code, upserts the user in the `users` table, claims any pending org memberships matching the user's email, auto-creates a personal org if the user has no memberships, and sets an httpOnly session cookie. The `COOKIE_DOMAIN` env var controls the cookie domain (set to `localhost` for dev so the cookie is shared between `:3000` and `:8000`).
 
-**Key files**: `auth.py` (config, JWT helpers), `dependencies.py` (`verify_auth` + `AuthContext`), `routers/auth.py` (login/callback/me/logout).
+**RBAC**: Org membership with roles (owner/editor/viewer) enforced on all data routes. Role is resolved by following the resource chain (page → collection → space → workspace → org → membership). Dependency factories in `rbac.py` handle resolution for each resource level.
+
+**Key files**: `auth.py` (config, JWT helpers), `dependencies.py` (`verify_auth` + `AuthContext`), `rbac.py` (role enforcement dependencies), `routers/auth.py` (login/callback/me/logout), `routers/organizations.py` (org CRUD + member management).
 
 ### Frontend Patterns
 

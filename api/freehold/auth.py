@@ -44,9 +44,7 @@ def get_oidc_config() -> OIDCConfig:
             issuer=os.getenv("OIDC_ISSUER") or None,
             client_id=os.getenv("OIDC_CLIENT_ID", ""),
             client_secret=os.getenv("OIDC_CLIENT_SECRET", ""),
-            redirect_uri=os.getenv(
-                "OIDC_REDIRECT_URI", "http://localhost:8000/api/auth/callback"
-            ),
+            redirect_uri=os.getenv("OIDC_REDIRECT_URI", "http://localhost:8000/api/auth/callback"),
             frontend_url=os.getenv("FRONTEND_URL", "http://localhost:3000"),
             cookie_domain=os.getenv("COOKIE_DOMAIN") or None,
             secret_key=os.getenv("SECRET_KEY", "changeme"),

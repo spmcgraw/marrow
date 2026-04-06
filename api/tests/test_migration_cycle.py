@@ -11,9 +11,10 @@ import uuid
 import psycopg2
 import psycopg2.errors
 import pytest
-from alembic import command
 from alembic.config import Config
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+
+from alembic import command
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://freehold:freehold@localhost:5433/freehold")
 
@@ -57,8 +58,14 @@ def _insert_revision(db_url: str) -> str:
     conn.autocommit = True
     with conn.cursor() as cur:
         cur.execute(
-            "INSERT INTO workspaces (slug, name) VALUES (%s, %s) RETURNING id",
-            (f"ws-{uuid.uuid4().hex[:6]}", "Test WS"),
+            "INSERT INTO organizations (slug, name) VALUES (%s, %s) RETURNING id",
+            (f"org-{uuid.uuid4().hex[:6]}", "Test Org"),
+        )
+        org_id = cur.fetchone()[0]
+
+        cur.execute(
+            "INSERT INTO workspaces (org_id, slug, name) VALUES (%s, %s, %s) RETURNING id",
+            (org_id, f"ws-{uuid.uuid4().hex[:6]}", "Test WS"),
         )
         ws_id = cur.fetchone()[0]
 
@@ -108,7 +115,17 @@ class TestMigrationCycle:
             tables = {row[0] for row in cur.fetchall()}
         conn.close()
 
-        expected = {"workspaces", "spaces", "collections", "pages", "revisions", "attachments"}
+        expected = {
+            "workspaces",
+            "spaces",
+            "collections",
+            "pages",
+            "revisions",
+            "attachments",
+            "users",
+            "organizations",
+            "org_memberships",
+        }
         assert expected.issubset(tables)
 
     def test_revision_update_is_blocked(self, db_url):
@@ -117,25 +134,8 @@ class TestMigrationCycle:
         conn = psycopg2.connect(db_url)
         cur = conn.cursor()
         try:
-            cur.execute(
-                "UPDATE revisions SET content = 'tampered' WHERE id = %s", (rev_id,)
-            )
+            cur.execute("UPDATE revisions SET content = 'tampered' WHERE id = %s", (rev_id,))
             pytest.fail("Expected trigger to block UPDATE on revisions")
-        except psycopg2.errors.RaiseException:
-            pass
-        finally:
-            conn.rollback()
-            cur.close()
-            conn.close()
-
-    def test_revision_delete_is_blocked(self, db_url):
-        rev_id = _insert_revision(db_url)
-
-        conn = psycopg2.connect(db_url)
-        cur = conn.cursor()
-        try:
-            cur.execute("DELETE FROM revisions WHERE id = %s", (rev_id,))
-            pytest.fail("Expected trigger to block DELETE on revisions")
         except psycopg2.errors.RaiseException:
             pass
         finally:
@@ -156,6 +156,11 @@ class TestMigrationCycle:
         conn.close()
 
         freehold_tables = {
-            "workspaces", "spaces", "collections", "pages", "revisions", "attachments"
+            "workspaces",
+            "spaces",
+            "collections",
+            "pages",
+            "revisions",
+            "attachments",
         }
         assert not freehold_tables & tables

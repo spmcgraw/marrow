@@ -14,7 +14,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from freehold.export import SCHEMA_VERSION, export_workspace
-from freehold.models import Attachment, Collection, Page, Revision, Space, Workspace
+from freehold.models import Attachment, Collection, Organization, Page, Revision, Space, Workspace
 from freehold.storage import StorageAdapter
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://freehold:freehold@localhost:5433/freehold")
@@ -62,7 +62,11 @@ def session(engine):
 @pytest.fixture
 def seeded(session):
     """Seed a workspace with two pages (two revisions each) and one attachment."""
-    ws = Workspace(slug="export-test-ws", name="Export Test Workspace")
+    org = Organization(slug="export-test-org", name="Export Test Org")
+    session.add(org)
+    session.flush()
+
+    ws = Workspace(org_id=org.id, slug="export-test-ws", name="Export Test Workspace")
     session.add(ws)
     session.flush()
 

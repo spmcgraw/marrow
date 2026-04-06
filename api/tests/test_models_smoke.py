@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from freehold.models import Collection, Page, Revision, Space, Workspace
+from freehold.models import Collection, Organization, Page, Revision, Space, Workspace
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://freehold:freehold@localhost:5433/freehold")
 
@@ -26,7 +26,11 @@ def session(engine):
 
 
 def test_create_workspace_hierarchy(session):
-    workspace = Workspace(slug="smoke-ws", name="Smoke Workspace")
+    org = Organization(slug="smoke-org", name="Smoke Org")
+    session.add(org)
+    session.flush()
+
+    workspace = Workspace(org_id=org.id, slug="smoke-ws", name="Smoke Workspace")
     session.add(workspace)
     session.flush()
 

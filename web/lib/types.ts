@@ -1,7 +1,24 @@
 // TypeScript types mirroring the Freehold API Pydantic schemas.
 
+export interface Organization {
+  id: string;
+  slug: string;
+  name: string;
+  created_at: string;
+}
+
+export interface OrgMembership {
+  id: string;
+  org_id: string;
+  user_id: string | null;
+  email: string;
+  role: "owner" | "editor" | "viewer";
+  created_at: string;
+}
+
 export interface Workspace {
   id: string;
+  org_id: string;
   slug: string;
   name: string;
   created_at: string;
@@ -91,6 +108,7 @@ export interface SpaceTreeItem {
 
 export interface WorkspaceTree {
   id: string;
+  org_id: string;
   slug: string;
   name: string;
   spaces: SpaceTreeItem[];

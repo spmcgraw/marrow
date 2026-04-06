@@ -4,11 +4,13 @@ These endpoints are registered WITHOUT the global auth dependency so that
 unauthenticated users can initiate the login flow.
 """
 
+import re
 import uuid
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy import func as sa_func
+from sqlalchemy.orm import Session
 
 from ..auth import (
     COOKIE_NAME,
@@ -19,10 +21,22 @@ from ..auth import (
     make_session_cookie_params,
 )
 from ..dependencies import get_db
-from ..models import User
+from ..models import Organization, OrgMembership, OrgRole, User
 from ..schemas import AuthStatus, UserRead
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+def _unique_org_slug(db: Session, base: str) -> str:
+    """Generate a unique org slug from a base string, appending a suffix on collision."""
+    slug = re.sub(r"[^a-z0-9-]", "-", base.lower()).strip("-")[:50] or "org"
+    candidate = slug
+    attempt = 0
+    while db.query(Organization).filter(Organization.slug == candidate).first() is not None:
+        attempt += 1
+        suffix = uuid.uuid4().hex[:4]
+        candidate = f"{slug}-{suffix}"
+    return candidate
 
 
 @router.get("/login")
@@ -78,6 +92,41 @@ async def callback(request: Request):
                 name=name,
             )
             db.add(user)
+        db.flush()
+        db.refresh(user)
+
+        # Claim any pending memberships that match this user's email
+        pending = (
+            db.query(OrgMembership)
+            .filter(OrgMembership.email == user.email, OrgMembership.user_id.is_(None))
+            .all()
+        )
+        for membership in pending:
+            membership.user_id = user.id
+
+        # Auto-create personal org if user has no memberships
+        has_memberships = (
+            db.query(OrgMembership).filter(OrgMembership.user_id == user.id).first()
+        ) is not None
+
+        if not has_memberships:
+            slug_base = email.split("@")[0] if email else "user"
+            slug = _unique_org_slug(db, slug_base)
+            personal_org = Organization(
+                name=f"{name}'s Space",
+                slug=slug,
+            )
+            db.add(personal_org)
+            db.flush()
+            db.add(
+                OrgMembership(
+                    org_id=personal_org.id,
+                    user_id=user.id,
+                    email=user.email,
+                    role=OrgRole.OWNER.value,
+                )
+            )
+
         db.commit()
         db.refresh(user)
         user_id = user.id

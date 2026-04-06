@@ -13,8 +13,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from .export import SCHEMA_VERSION
-from .models import Attachment, Collection, Page, Revision, Space, Workspace
+from .models import Attachment, Collection, Organization, Page, Revision, Space, Workspace
 from .storage import StorageAdapter
 
 
@@ -47,10 +46,9 @@ def restore_workspace(
         manifest = json.loads(zf.read("manifest.json"))
 
         schema_version = manifest.get("schema_version")
-        if schema_version != SCHEMA_VERSION:
+        if schema_version not in ("1", "2"):
             raise ValueError(
-                f"Unsupported bundle schema version '{schema_version}' "
-                f"(expected '{SCHEMA_VERSION}')"
+                f"Unsupported bundle schema version '{schema_version}' (expected '1' or '2')"
             )
 
         ws_meta = manifest["workspace"]
@@ -67,10 +65,46 @@ def restore_workspace(
                 "Delete it before restoring."
             )
 
+        # --- Organization ---
+        # v2 bundles include org metadata; v1 bundles create a new org from workspace name.
+        if schema_version == "2" and "organization" in manifest:
+            org_meta = manifest["organization"]
+            org_id = uuid.UUID(org_meta["id"])
+            existing_org = session.get(Organization, org_id)
+            if existing_org is None:
+                session.add(
+                    Organization(
+                        id=org_id,
+                        slug=org_meta["slug"],
+                        name=org_meta["name"],
+                        created_at=_dt(org_meta["created_at"]),
+                    )
+                )
+                session.flush()
+        else:
+            # v1 bundle: create a new org named after the workspace
+            org_id = uuid.uuid4()
+            slug_candidate = f"{ws_meta['slug']}-imported"
+            # Ensure slug uniqueness
+            counter = 0
+            slug = slug_candidate
+            while session.query(Organization).filter_by(slug=slug).first() is not None:
+                counter += 1
+                slug = f"{slug_candidate}-{counter}"
+            session.add(
+                Organization(
+                    id=org_id,
+                    slug=slug,
+                    name=f"{ws_meta['name']} (imported)",
+                )
+            )
+            session.flush()
+
         # --- Workspace ---
         session.add(
             Workspace(
                 id=ws_id,
+                org_id=org_id,
                 slug=ws_meta["slug"],
                 name=ws_meta["name"],
                 created_at=_dt(ws_meta["created_at"]),
