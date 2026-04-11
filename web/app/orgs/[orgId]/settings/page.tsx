@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,9 +80,18 @@ export default function OrgSettingsPage() {
 
   return (
     <div className="mx-auto max-w-2xl p-8 space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold">{org.name}</h1>
-        <p className="text-sm text-muted-foreground">Organization settings</p>
+      <div className="space-y-3">
+        <Link
+          href="/workspaces"
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="h-3 w-3" />
+          Workspaces
+        </Link>
+        <div>
+          <h1 className="text-2xl font-bold">{org.name}</h1>
+          <p className="text-sm text-muted-foreground">Organization settings</p>
+        </div>
       </div>
 
       <section className="space-y-4">
