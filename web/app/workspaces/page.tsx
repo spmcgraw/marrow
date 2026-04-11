@@ -6,17 +6,19 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { createWorkspace, listWorkspaces, slugify } from "@/lib/api";
-import type { Workspace } from "@/lib/types";
+import { createWorkspace, getAuthStatus, listWorkspaces, logout, slugify } from "@/lib/api";
+import type { AuthStatus, Workspace } from "@/lib/types";
 
 export default function WorkspacesPage() {
   const router = useRouter();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [auth, setAuth] = useState<AuthStatus | null>(null);
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     listWorkspaces().then(setWorkspaces).catch(() => toast.error("Failed to load workspaces"));
+    getAuthStatus().then(setAuth).catch(() => {});
   }, []);
 
   async function handleCreate(e: React.FormEvent) {
@@ -35,9 +37,26 @@ export default function WorkspacesPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-background px-4">
       <div className="w-full max-w-md space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Freehold</h1>
-          <p className="text-sm text-muted-foreground">Your knowledge, owned outright.</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Freehold</h1>
+            <p className="text-sm text-muted-foreground">Your knowledge, owned outright.</p>
+          </div>
+          {auth?.authenticated && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>{auth.user?.name}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={async () => {
+                  const logoutUrl = await logout();
+                  window.location.href = logoutUrl ?? "/login";
+                }}
+              >
+                Sign out
+              </Button>
+            </div>
+          )}
         </div>
 
         {workspaces.length > 0 && (

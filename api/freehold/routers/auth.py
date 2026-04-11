@@ -135,8 +135,9 @@ async def callback(request: Request):
     finally:
         db.close()
 
-    # Issue session JWT and set cookie
-    session_jwt = create_session_jwt(user_id, user_email, user_name)
+    # Issue session JWT and set cookie (include OIDC id_token for RP-Initiated Logout)
+    oidc_id_token = token.get("id_token") if isinstance(token.get("id_token"), str) else None
+    session_jwt = create_session_jwt(user_id, user_email, user_name, oidc_id_token=oidc_id_token)
     cookie_params = make_session_cookie_params()
 
     response = RedirectResponse(url=config.frontend_url, status_code=302)
@@ -180,15 +181,61 @@ async def me(request: Request) -> AuthStatus:
 
 
 @router.post("/logout")
-async def logout():
-    """Clear the session cookie."""
+async def logout(request: Request):
+    """Clear the session cookie and return the IdP logout URL if OIDC is active."""
+    from urllib.parse import urlencode
+
+    import httpx
     from fastapi.responses import JSONResponse
 
     config = get_oidc_config()
-    response = JSONResponse(content={"status": "ok"})
+
+    # Extract the OIDC id_token from the session before clearing
+    id_token_hint = None
+    session_token = request.cookies.get(COOKIE_NAME)
+    if session_token:
+        try:
+            claims = decode_session_jwt(session_token)
+            id_token_hint = claims.get("oidc_id_token")
+        except Exception:
+            pass
+
+    # Clear the Freehold session cookie
+    body: dict = {"status": "ok"}
+    response = JSONResponse(content=body)
     response.delete_cookie(
         key=COOKIE_NAME,
         path="/",
         domain=config.cookie_domain,
     )
+
+    # Build the IdP logout URL for RP-Initiated Logout
+    if config.is_enabled:
+        try:
+            async with httpx.AsyncClient() as client:
+                metadata_resp = await client.get(
+                    f"{config.issuer}/.well-known/openid-configuration",
+                    timeout=5.0,
+                )
+                metadata_resp.raise_for_status()
+                metadata = metadata_resp.json()
+
+            end_session_endpoint = metadata.get("end_session_endpoint")
+            if end_session_endpoint:
+                params: dict[str, str] = {
+                    "client_id": config.client_id,
+                    "post_logout_redirect_uri": config.frontend_url + "/login",
+                }
+                if id_token_hint:
+                    params["id_token_hint"] = id_token_hint
+                body["logout_url"] = f"{end_session_endpoint}?{urlencode(params)}"
+                response = JSONResponse(content=body)
+                response.delete_cookie(
+                    key=COOKIE_NAME,
+                    path="/",
+                    domain=config.cookie_domain,
+                )
+        except Exception:
+            pass  # Fall back to local-only logout
+
     return response

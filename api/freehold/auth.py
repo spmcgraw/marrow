@@ -86,6 +86,8 @@ def create_session_jwt(
     user_id: uuid.UUID,
     email: str,
     name: str,
+    *,
+    oidc_id_token: str | None = None,
 ) -> str:
     """Create a session JWT for the given user."""
     config = get_oidc_config()
@@ -97,6 +99,8 @@ def create_session_jwt(
         "iat": int(now.timestamp()),
         "exp": int(now.timestamp()) + config.session_max_age,
     }
+    if oidc_id_token:
+        payload["oidc_id_token"] = oidc_id_token
     return jwt.encode(payload, config.secret_key, algorithm=_JWT_ALGORITHM)
 
 

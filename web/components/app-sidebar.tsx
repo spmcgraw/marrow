@@ -295,8 +295,8 @@ export function AppSidebar({ tree, user }: Props) {
               variant="ghost"
               size="xs"
               onClick={async () => {
-                await logout();
-                window.location.href = "/login";
+                const logoutUrl = await logout();
+                window.location.href = logoutUrl ?? "/login";
               }}
             >
               Sign out

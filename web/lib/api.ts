@@ -212,8 +212,11 @@ export function getAuthStatus(): Promise<AuthStatus> {
   return apiFetch("/api/auth/me");
 }
 
-export async function logout(): Promise<void> {
-  await apiFetch("/api/auth/logout", { method: "POST" });
+export async function logout(): Promise<string | null> {
+  const data = await apiFetch<{ status: string; logout_url?: string }>("/api/auth/logout", {
+    method: "POST",
+  });
+  return data.logout_url ?? null;
 }
 
 // ---------------------------------------------------------------------------
