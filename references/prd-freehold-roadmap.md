@@ -112,6 +112,26 @@ This PRD defines the phased roadmap to turn Freehold from a working proof-of-con
 - Both full and slim exports work via CLI and API
 - UI shows size estimate and explains the tradeoff
 
+### 1.6 v0.1.0 Release — Deployment Docs, Docker, and README
+
+**Decision:** Ship v0.1.0 after #37 and #38 are both complete.
+**Why:** All Phase 1 functionality must be in place before the first public release. Deployment artifacts and documentation are the final step — they let a self-hoster get running without reading source code.
+
+**Implementation:**
+- `README.md` updated: project overview, feature summary, local dev quickstart
+- `Dockerfile` for FastAPI backend
+- `Dockerfile` for Next.js frontend
+- `docker-compose.prod.yml` for production-style deployment with env var docs
+- Environment variable reference complete for both `api/.env` and `web/.env.local`
+- OIDC configuration guide (Keycloak, Google, etc.)
+- GitHub release `v0.1.0` tagged on `main`
+
+**Blocked by:** 1.4 (#37), 1.5 (#38)
+
+**Done when:**
+- A stranger can self-host Freehold in under 30 minutes following the README
+- `v0.1.0` GitHub release created and tagged
+
 ---
 
 ## Phase 2 — Collaboration and SaaS
