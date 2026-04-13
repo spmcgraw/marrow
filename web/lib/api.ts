@@ -126,11 +126,12 @@ export function createPage(
   collectionId: string,
   slug: string,
   title: string,
-  content = ""
+  content = "",
+  content_format = "markdown"
 ): Promise<Page> {
   return apiFetch(`/api/collections/${collectionId}/pages`, {
     method: "POST",
-    body: JSON.stringify({ slug, title, content }),
+    body: JSON.stringify({ slug, title, content, content_format }),
   });
 }
 
@@ -140,7 +141,7 @@ export function getPage(pageId: string): Promise<Page> {
 
 export function updatePage(
   pageId: string,
-  patch: { title?: string; content?: string }
+  patch: { title?: string; content?: string; content_format?: string }
 ): Promise<Page> {
   return apiFetch(`/api/pages/${pageId}`, {
     method: "PATCH",

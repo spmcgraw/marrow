@@ -126,13 +126,60 @@ def test_export_restore_round_trip(db_url, tmp_path):
         session.add_all([page1, page2])
         session.flush()
 
-        rev1a = Revision(page_id=page1.id, content="# Page One\nFirst draft.")
-        rev1b = Revision(page_id=page1.id, content="# Page One\nSecond draft.")
+        rev1a = Revision(
+            page_id=page1.id,
+            content="# Page One\nFirst draft.",
+            content_format="markdown",
+        )
+        rev1b = Revision(
+            page_id=page1.id,
+            content="# Page One\nSecond draft.",
+            content_format="markdown",
+        )
+        # Simulate a JSON revision (BlockNote format) for the current revision
+        import json as _json
+
+        _h1_block = {
+            "id": "a1",
+            "type": "heading",
+            "props": {
+                "level": 1,
+                "textColor": "default",
+                "backgroundColor": "default",
+                "textAlignment": "left",
+            },
+            "content": [{"type": "text", "text": "Page One", "styles": {}}],
+            "children": [],
+        }
+        _p_block = {
+            "id": "a2",
+            "type": "paragraph",
+            "props": {
+                "textColor": "default",
+                "backgroundColor": "default",
+                "textAlignment": "left",
+            },
+            "content": [
+                {"type": "text", "text": "See also ", "styles": {}},
+                {
+                    "type": "link",
+                    "href": f"/pages/{page2.id}",
+                    "content": [{"type": "text", "text": "Page Two", "styles": {}}],
+                },
+            ],
+            "children": [],
+        }
+        rev1c_content = _json.dumps([_h1_block, _p_block])
         rev1c = Revision(
             page_id=page1.id,
-            content=f"# Page One\nSee also [Page Two](/pages/{page2.id}).",
+            content=rev1c_content,
+            content_format="json",
         )
-        rev2a = Revision(page_id=page2.id, content="# Page Two\nOnly revision.")
+        rev2a = Revision(
+            page_id=page2.id,
+            content="# Page Two\nOnly revision.",
+            content_format="markdown",
+        )
         session.add_all([rev1a, rev1b, rev1c, rev2a])
         session.flush()
 
@@ -173,9 +220,18 @@ def test_export_restore_round_trip(db_url, tmp_path):
                 "title": page1.title,
                 "current_revision_id": str(page1.current_revision_id),
                 "revisions": {
-                    str(rev1a.id): rev1a.content,
-                    str(rev1b.id): rev1b.content,
-                    str(rev1c.id): rev1c.content,
+                    str(rev1a.id): {
+                        "content": rev1a.content,
+                        "content_format": rev1a.content_format,
+                    },
+                    str(rev1b.id): {
+                        "content": rev1b.content,
+                        "content_format": rev1b.content_format,
+                    },
+                    str(rev1c.id): {
+                        "content": rev1c.content,
+                        "content_format": rev1c.content_format,
+                    },
                 },
             },
             str(page2.id): {
@@ -183,7 +239,10 @@ def test_export_restore_round_trip(db_url, tmp_path):
                 "title": page2.title,
                 "current_revision_id": str(page2.current_revision_id),
                 "revisions": {
-                    str(rev2a.id): rev2a.content,
+                    str(rev2a.id): {
+                        "content": rev2a.content,
+                        "content_format": rev2a.content_format,
+                    },
                 },
             },
         }
@@ -279,9 +338,12 @@ def test_export_restore_round_trip(db_url, tmp_path):
                 f"Revision IDs differ for page {page_id}. "
                 f"Got: {set(restored_revs.keys())} Expected: {set(expected['revisions'].keys())}"
             )
-            for rev_id, content in expected["revisions"].items():
-                assert restored_revs[rev_id].content == content, (
+            for rev_id, rev_data in expected["revisions"].items():
+                assert restored_revs[rev_id].content == rev_data["content"], (
                     f"Content mismatch for revision {rev_id}"
+                )
+                assert restored_revs[rev_id].content_format == rev_data["content_format"], (
+                    f"content_format mismatch for revision {rev_id}"
                 )
 
         # Attachment metadata

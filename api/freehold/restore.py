@@ -46,9 +46,9 @@ def restore_workspace(
         manifest = json.loads(zf.read("manifest.json"))
 
         schema_version = manifest.get("schema_version")
-        if schema_version not in ("1", "2"):
+        if schema_version not in ("1", "2", "3"):
             raise ValueError(
-                f"Unsupported bundle schema version '{schema_version}' (expected '1' or '2')"
+                f"Unsupported bundle schema version '{schema_version}' (expected '1', '2', or '3')"
             )
 
         ws_meta = manifest["workspace"]
@@ -66,8 +66,8 @@ def restore_workspace(
             )
 
         # --- Organization ---
-        # v2 bundles include org metadata; v1 bundles create a new org from workspace name.
-        if schema_version == "2" and "organization" in manifest:
+        # v2/v3 bundles include org metadata; v1 bundles create a new org from workspace name.
+        if schema_version in ("2", "3") and "organization" in manifest:
             org_meta = manifest["organization"]
             org_id = uuid.UUID(org_meta["id"])
             existing_org = session.get(Organization, org_id)
@@ -158,7 +158,12 @@ def restore_workspace(
 
         # --- Revisions ---
         for r in manifest["revisions"]:
-            rev_file = f"revisions/{r['page_id']}/{r['id']}.md"
+            content_format = r.get("content_format", "markdown")
+            if content_format == "json":
+                # v3 bundle: canonical content is the .json file
+                rev_file = f"revisions/{r['page_id']}/{r['id']}.json"
+            else:
+                rev_file = f"revisions/{r['page_id']}/{r['id']}.md"
             if rev_file not in names:
                 raise ValueError(f"Bundle is missing revision file: {rev_file}")
             content = zf.read(rev_file).decode()
@@ -167,6 +172,7 @@ def restore_workspace(
                     id=uuid.UUID(r["id"]),
                     page_id=uuid.UUID(r["page_id"]),
                     content=content,
+                    content_format=content_format,
                     created_at=_dt(r["created_at"]),
                 )
             )

@@ -32,6 +32,7 @@ def _get_page_or_404(page_id: UUID, db: Session) -> Page:
 
 def _page_with_content(page: Page) -> PageReadWithContent:
     content = page.current_revision.content if page.current_revision else None
+    content_format = page.current_revision.content_format if page.current_revision else "markdown"
     return PageReadWithContent(
         id=page.id,
         collection_id=page.collection_id,
@@ -40,6 +41,7 @@ def _page_with_content(page: Page) -> PageReadWithContent:
         current_revision_id=page.current_revision_id,
         created_at=page.created_at,
         content=content,
+        content_format=content_format,
     )
 
 
@@ -66,7 +68,7 @@ def update_page(
         page.title = body.title
 
     if body.content is not None:
-        rev = Revision(page_id=page.id, content=body.content)
+        rev = Revision(page_id=page.id, content=body.content, content_format=body.content_format)
         db.add(rev)
         db.flush()
         page.current_revision_id = rev.id

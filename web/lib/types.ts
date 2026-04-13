@@ -48,11 +48,13 @@ export interface Page {
   current_revision_id: string | null;
   created_at: string;
   content?: string | null;
+  content_format?: string; // 'markdown' | 'json'
 }
 
 export interface Revision {
   id: string;
   page_id: string;
+  content_format: string; // 'markdown' | 'json'
   created_at: string;
   content?: string;
 }

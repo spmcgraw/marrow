@@ -78,11 +78,13 @@ class PageCreate(BaseModel):
     slug: str
     title: str
     content: str = ""  # seeds the first revision
+    content_format: str = "markdown"  # 'markdown' or 'json'
 
 
 class PageUpdate(BaseModel):
     title: str | None = None
     content: str | None = None  # non-None → new revision appended
+    content_format: str = "markdown"  # format of the new content
 
 
 class PageRead(_ReadBase):
@@ -96,6 +98,7 @@ class PageRead(_ReadBase):
 
 class PageReadWithContent(PageRead):
     content: str | None = None  # current revision content; None if no revisions yet
+    content_format: str = "markdown"  # format of current revision content
 
 
 # ---------------------------------------------------------------------------
@@ -106,6 +109,7 @@ class PageReadWithContent(PageRead):
 class RevisionRead(_ReadBase):
     id: UUID
     page_id: UUID
+    content_format: str
     created_at: datetime
 
 

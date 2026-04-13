@@ -202,6 +202,8 @@ class Revision(Base):
     )
     page_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    # 'markdown' for legacy plain-text revisions; 'json' for BlockNote JSON revisions.
+    content_format: Mapped[str] = mapped_column(Text, nullable=False, server_default="markdown")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

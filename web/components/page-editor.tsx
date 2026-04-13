@@ -3,21 +3,37 @@
 /**
  * PageEditor — the main editing surface.
  *
- * Uses BlockNote for a Notion-style block editor.
- * Content is serialized to/from Markdown for storage so the export bundle
- * remains human-readable. BlockNote's internal JSON is never persisted.
+ * Uses BlockNote for a Notion-style block editor. Content is stored as
+ * BlockNote JSON (content_format='json') for new saves. Legacy Markdown
+ * revisions (content_format='markdown') are read-only-parsed on load for
+ * backward compatibility.
  *
- * Save behavior: auto-saves 2 seconds after the user stops typing.
- * Each save creates a new revision via PATCH /api/pages/{id}.
+ * Features:
+ * - Code blocks with Shiki syntax highlighting
+ * - Tables with drag handles (TableHandlesController)
+ * - @-mention page links via suggestion menu (SuggestionMenuController)
+ * - Auto-save 2 seconds after last keystroke
  */
 
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useParams } from "next/navigation";
 import { useTheme } from "next-themes";
-import { useCreateBlockNote } from "@blocknote/react";
+import {
+  BlockNoteSchema,
+  createCodeBlockSpec,
+  defaultBlockSpecs,
+} from "@blocknote/core";
+import {
+  SuggestionMenuController,
+  TableHandlesController,
+  useCreateBlockNote,
+  type DefaultReactSuggestionItem,
+} from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
+import { createHighlighter } from "shiki";
 import { Clock, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -34,6 +50,7 @@ import {
   getRevision,
   listAttachments,
   listRevisions,
+  searchWorkspace,
   updatePage,
   uploadAttachment,
 } from "@/lib/api";
@@ -45,16 +62,56 @@ interface Props {
   initialPage: Page;
 }
 
+// ---------------------------------------------------------------------------
+// BlockNote schema with Shiki syntax highlighting for code blocks
+// ---------------------------------------------------------------------------
+
+const schema = BlockNoteSchema.create({
+  blockSpecs: {
+    ...defaultBlockSpecs,
+    codeBlock: createCodeBlockSpec({
+      createHighlighter: () =>
+        createHighlighter({
+          themes: ["github-light", "github-dark"],
+          langs: [
+            "javascript",
+            "typescript",
+            "python",
+            "bash",
+            "json",
+            "html",
+            "css",
+            "sql",
+            "go",
+            "rust",
+            "yaml",
+            "markdown",
+          ],
+        }),
+      defaultLanguage: "text",
+    }),
+  },
+});
+
+// ---------------------------------------------------------------------------
+// PageEditor component
+// ---------------------------------------------------------------------------
+
 export function PageEditor({ initialPage }: Props) {
   const [title, setTitle] = useState(initialPage.title);
   const [status, setStatus] = useState<SaveStatus>("idle");
   const { resolvedTheme } = useTheme();
 
+  // Extract workspaceId from the URL for page mention search
+  const params = useParams<{ workspaceId?: string }>();
+  const workspaceId = params?.workspaceId;
+
   // Refs for save logic — avoids stale closures in debounce callbacks
   const titleRef = useRef(title);
   const savedTitleRef = useRef(initialPage.title);
   const savedContentRef = useRef(initialPage.content ?? "");
-  const pendingMarkdownRef = useRef(initialPage.content ?? "");
+  // pendingContentRef holds the current JSON string to save
+  const pendingContentRef = useRef(initialPage.content ?? "");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isInitializingRef = useRef(false);
 
@@ -62,23 +119,39 @@ export function PageEditor({ initialPage }: Props) {
     titleRef.current = title;
   }, [title]);
 
-  const editor = useCreateBlockNote();
+  const editor = useCreateBlockNote({ schema });
 
-  // Parse initial Markdown content into BlockNote blocks on mount
+  // Load initial content — JSON (new format) or Markdown (legacy)
   useEffect(() => {
     const content = initialPage.content;
     if (!content) return;
 
     isInitializingRef.current = true;
-    const blocks = editor.tryParseMarkdownToBlocks(content);
-    editor.replaceBlocks(editor.document, blocks);
+
+    const fmt = initialPage.content_format ?? "markdown";
+    if (fmt === "json") {
+      try {
+        const blocks = JSON.parse(content);
+        editor.replaceBlocks(editor.document, blocks);
+        pendingContentRef.current = content;
+      } catch {
+        // Malformed JSON: fall back to showing raw text
+        pendingContentRef.current = content;
+      }
+    } else {
+      // Legacy Markdown: parse into blocks
+      const blocks = editor.tryParseMarkdownToBlocks(content);
+      editor.replaceBlocks(editor.document, blocks);
+      // On first save this will be re-serialized as JSON
+      pendingContentRef.current = content;
+    }
+
     isInitializingRef.current = false;
-    pendingMarkdownRef.current = content;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveNow = useCallback(async () => {
     const currentTitle = titleRef.current;
-    const currentContent = pendingMarkdownRef.current;
+    const currentContent = pendingContentRef.current;
 
     const newTitle = currentTitle !== savedTitleRef.current ? currentTitle : undefined;
     const newContent =
@@ -88,7 +161,11 @@ export function PageEditor({ initialPage }: Props) {
 
     setStatus("saving");
     try {
-      await updatePage(initialPage.id, { title: newTitle, content: newContent });
+      await updatePage(initialPage.id, {
+        title: newTitle,
+        content: newContent,
+        content_format: "json",
+      });
       savedTitleRef.current = currentTitle;
       savedContentRef.current = currentContent;
       setStatus("saved");
@@ -112,23 +189,59 @@ export function PageEditor({ initialPage }: Props) {
     };
   }, [title, scheduleSave]);
 
-  // Serialize editor blocks to Markdown and schedule a save
+  // Serialize editor document to JSON and schedule a save
   const handleEditorChange = useCallback(() => {
     if (isInitializingRef.current) return;
-    const markdown = editor.blocksToMarkdownLossy(editor.document);
-    pendingMarkdownRef.current = markdown;
+    const json = JSON.stringify(editor.document);
+    pendingContentRef.current = json;
     scheduleSave();
   }, [editor, scheduleSave]);
 
-  // Restore a revision: parse its Markdown into blocks and update editor
+  // Restore a revision into the editor
   const handleRestore = useCallback(
-    async (markdownContent: string) => {
-      const blocks = editor.tryParseMarkdownToBlocks(markdownContent);
-      editor.replaceBlocks(editor.document, blocks);
-      pendingMarkdownRef.current = markdownContent;
+    async (content: string, contentFormat: string) => {
+      if (contentFormat === "json") {
+        try {
+          const blocks = JSON.parse(content);
+          editor.replaceBlocks(editor.document, blocks);
+          pendingContentRef.current = content;
+        } catch {
+          toast.error("Could not parse revision content");
+          return;
+        }
+      } else {
+        // Legacy markdown revision
+        const blocks = editor.tryParseMarkdownToBlocks(content);
+        editor.replaceBlocks(editor.document, blocks);
+        // Re-serialize as JSON for the next save
+        pendingContentRef.current = JSON.stringify(editor.document);
+      }
       scheduleSave();
     },
     [editor, scheduleSave],
+  );
+
+  // ---------------------------------------------------------------------------
+  // @-mention suggestion menu — queries workspace pages
+  // ---------------------------------------------------------------------------
+
+  const getPageMentionItems = useCallback(
+    async (query: string): Promise<DefaultReactSuggestionItem[]> => {
+      if (!workspaceId) return [];
+      try {
+        const { results } = await searchWorkspace(workspaceId, query || " ");
+        return results.slice(0, 8).map((result) => ({
+          title: result.title,
+          subtext: `${result.space_name} / ${result.collection_name}`,
+          onItemClick: () => {
+            editor.createLink(`/w/${workspaceId}/pages/${result.page_id}`, result.title);
+          },
+        }));
+      } catch {
+        return [];
+      }
+    },
+    [editor, workspaceId],
   );
 
   const statusLabel = {
@@ -167,7 +280,16 @@ export function PageEditor({ initialPage }: Props) {
           onChange={handleEditorChange}
           theme={resolvedTheme === "dark" ? "dark" : "light"}
           style={{ minHeight: "100%" }}
-        />
+        >
+          {/* Table drag handles */}
+          <TableHandlesController />
+
+          {/* @-mention suggestion menu for page links */}
+          <SuggestionMenuController
+            triggerCharacter="@"
+            getItems={getPageMentionItems}
+          />
+        </BlockNoteView>
       </div>
     </div>
   );
@@ -182,7 +304,7 @@ function RevisionSheet({
   onRestore,
 }: {
   pageId: string;
-  onRestore: (content: string) => Promise<void>;
+  onRestore: (content: string, contentFormat: string) => Promise<void>;
 }) {
   const [revisions, setRevisions] = useState<Revision[]>([]);
   const [selected, setSelected] = useState<Revision | null>(null);
@@ -209,9 +331,21 @@ function RevisionSheet({
     }
   }
 
+  /** Display content for the preview pane — JSON is pretty-printed. */
+  function previewText(rev: Revision): string {
+    if (!rev.content) return "";
+    if (rev.content_format === "json") {
+      try {
+        return JSON.stringify(JSON.parse(rev.content), null, 2);
+      } catch {
+        return rev.content;
+      }
+    }
+    return rev.content;
+  }
+
   return (
     <Sheet onOpenChange={(open) => open && load()}>
-      {/* Base UI uses render prop instead of asChild */}
       <SheetTrigger render={<Button variant="ghost" size="sm" />}>
         <Clock className="mr-1 h-4 w-4" />
         History
@@ -236,17 +370,20 @@ function RevisionSheet({
                 <p className="text-muted-foreground">
                   {new Date(rev.created_at).toLocaleString()}
                 </p>
+                <p className="text-muted-foreground uppercase tracking-wide" style={{ fontSize: "10px" }}>
+                  {rev.content_format}
+                </p>
               </button>
             ))}
           </ScrollArea>
 
-          {/* Preview — raw Markdown for readability */}
+          {/* Preview */}
           <div className="flex flex-1 flex-col overflow-hidden">
             {selected ? (
               <>
                 <ScrollArea className="flex-1 p-3">
                   <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed">
-                    {selected.content}
+                    {previewText(selected)}
                   </pre>
                 </ScrollArea>
                 <div className="border-t p-3">
@@ -254,7 +391,7 @@ function RevisionSheet({
                     size="sm"
                     className="w-full"
                     onClick={async () => {
-                      await onRestore(selected.content!);
+                      await onRestore(selected.content!, selected.content_format);
                       toast.success("Revision restored — save to confirm");
                     }}
                   >
