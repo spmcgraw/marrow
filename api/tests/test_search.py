@@ -261,3 +261,41 @@ def test_title_matches_rank_higher_than_body(db):
 
     assert len(rows) == 2
     assert rows[0].title == "Kubernetes"
+
+
+# ---------------------------------------------------------------------------
+# PostgresSearchBackend class tests (browse + title-ILIKE paths)
+# ---------------------------------------------------------------------------
+
+
+def test_backend_browse_empty_query_returns_all_pages(db):
+    """An empty query should return all pages in the workspace (browse mode)."""
+    from freehold.search import PostgresSearchBackend
+
+    ws, _, col = _seed_workspace(db)
+    _create_page(db, col, "page-a", "Alpha", "First page content")
+    _create_page(db, col, "page-b", "Beta", "Second page content")
+
+    backend = PostgresSearchBackend()
+    results = backend.search(ws.id, "", db, limit=20)
+
+    titles = {r.title for r in results}
+    assert "Alpha" in titles
+    assert "Beta" in titles
+
+
+def test_backend_title_ilike_matches_partial_title(db):
+    """A partial title query should match via ILIKE even if body lacks the word."""
+    from freehold.search import PostgresSearchBackend
+
+    ws, _, col = _seed_workspace(db)
+    _create_page(db, col, "getting-started", "Getting Started Guide", "Welcome to Freehold.")
+    _create_page(db, col, "unrelated", "API Reference", "Lists all endpoints.")
+
+    backend = PostgresSearchBackend()
+    results = backend.search(ws.id, "getting", db, limit=20)
+
+    titles = [r.title for r in results]
+    assert "Getting Started Guide" in titles
+    # The title match should rank first
+    assert titles[0] == "Getting Started Guide"
