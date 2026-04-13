@@ -229,7 +229,7 @@ export function PageEditor({ initialPage }: Props) {
     async (query: string): Promise<DefaultReactSuggestionItem[]> => {
       if (!workspaceId) return [];
       try {
-        const { results } = await searchWorkspace(workspaceId, query || " ");
+        const { results } = await searchWorkspace(workspaceId, query);
         return results.slice(0, 8).map((result) => ({
           title: result.title,
           subtext: `${result.space_name} / ${result.collection_name}`,

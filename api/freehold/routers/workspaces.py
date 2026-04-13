@@ -114,10 +114,7 @@ def search_workspace(
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    if not q.strip():
-        return SearchResponse(query=q, results=[])
-
-    results = search.search(workspace_id, q.strip(), db)
+    results = search.search(workspace_id, q, db)
     return SearchResponse(
         query=q,
         results=[SearchResultItem(**vars(r)) for r in results],
