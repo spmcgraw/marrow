@@ -92,29 +92,31 @@ async def restore_workspace_endpoint(
     """Restore a workspace from an uploaded export bundle zip."""
     from ..restore import restore_workspace
 
-    if not bundle.filename or not bundle.filename.endswith(".zip"):
-        raise HTTPException(status_code=422, detail="Bundle must be a .zip file")
-
     storage_root = os.getenv("STORAGE_PATH", "/var/lib/freehold/attachments")
     storage = LocalFilesystemAdapter(storage_root)
 
-    data = await bundle.read()
+    _MAX_BUNDLE_BYTES = 500 * 1024 * 1024  # 500 MB
+    data = await bundle.read(_MAX_BUNDLE_BYTES + 1)
+    if len(data) > _MAX_BUNDLE_BYTES:
+        raise HTTPException(status_code=413, detail="Bundle exceeds maximum allowed size (500 MB)")
+
     with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
         tmp.write(data)
         tmp_path = Path(tmp.name)
 
     try:
-        try:
-            slug = restore_workspace(tmp_path, db, storage)
-            db.commit()
-        except ValueError as e:
-            db.rollback()
-            raise HTTPException(status_code=409, detail=str(e))
-        except Exception as e:
-            db.rollback()
-            raise HTTPException(status_code=422, detail=f"Failed to restore bundle: {e}")
-    finally:
+        slug = restore_workspace(tmp_path, db, storage)
+        db.commit()
+    except ValueError as e:
+        db.rollback()
         tmp_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        db.rollback()
+        tmp_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=422, detail=f"Failed to restore bundle: {e}")
+
+    tmp_path.unlink(missing_ok=True)
 
     ws = db.query(Workspace).filter_by(slug=slug).first()
     return ws

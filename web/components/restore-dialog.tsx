@@ -96,7 +96,11 @@ export function RestoreDialog() {
               e.preventDefault();
               setDragging(true);
             }}
-            onDragLeave={() => setDragging(false)}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                setDragging(false);
+              }
+            }}
             onDrop={handleDrop}
           >
             <Upload className="h-5 w-5 text-muted-foreground" />
