@@ -34,6 +34,7 @@ import {
 } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 import { createHighlighter } from "shiki";
+import { PageBreadcrumbs } from "@/components/page-breadcrumbs";
 import { Clock, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -255,7 +256,12 @@ export function PageEditor({ initialPage }: Props) {
     <div className="flex h-full flex-col">
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b px-6 py-2">
-        <span className="text-xs text-muted-foreground">{statusLabel}</span>
+        <div className="flex items-center gap-3">
+          <PageBreadcrumbs collectionId={initialPage.collection_id} />
+          {statusLabel && (
+            <span className="text-xs text-muted-foreground">{statusLabel}</span>
+          )}
+        </div>
         <div className="flex gap-2">
           <AttachmentSheet pageId={initialPage.id} collectionId={initialPage.collection_id} />
           <RevisionSheet pageId={initialPage.id} onRestore={handleRestore} />

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { WorkspaceTreeProvider } from "@/components/workspace-tree-context";
 import { getAuthStatus, getWorkspaceTree } from "@/lib/api";
 
 interface Props {
@@ -26,7 +27,9 @@ export default async function WorkspaceLayout({ children, params }: Props) {
   return (
     <SidebarProvider>
       <AppSidebar tree={tree} user={auth?.user ?? null} />
-      <SidebarInset>{children}</SidebarInset>
+      <SidebarInset>
+        <WorkspaceTreeProvider tree={tree}>{children}</WorkspaceTreeProvider>
+      </SidebarInset>
     </SidebarProvider>
   );
 }
