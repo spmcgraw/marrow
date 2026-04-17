@@ -120,8 +120,11 @@ This PRD defines the phased roadmap to turn Freehold from a working proof-of-con
 **Implementation:**
 - `README.md` updated: project overview, feature summary, local dev quickstart
 - `Dockerfile` for FastAPI backend
-- `Dockerfile` for Next.js frontend
-- `docker-compose.prod.yml` for production-style deployment with env var docs
+- `Dockerfile` for Next.js frontend (self-hosted path)
+- `docker-compose.prod.yml` for self-hosted production stack (backend + Postgres + frontend) with env var docs
+- `api/wrangler.toml` for Cloudflare Containers deployment (SaaS path)
+- `web/wrangler.toml` + `next.config.ts` update for Cloudflare Pages deployment (SaaS path)
+- GitHub Actions workflow: test → build Docker image → push to GHCR → deploy via Wrangler
 - Environment variable reference complete for both `api/.env` and `web/.env.local`
 - OIDC configuration guide (Keycloak, Google, etc.)
 - GitHub release `v0.1.0` tagged on `main`
@@ -130,6 +133,7 @@ This PRD defines the phased roadmap to turn Freehold from a working proof-of-con
 
 **Done when:**
 - A stranger can self-host Freehold in under 30 minutes following the README
+- Cloudflare deployment path documented (Pages + Containers + Neon + R2)
 - `v0.1.0` GitHub release created and tagged
 
 ---
@@ -157,23 +161,27 @@ This PRD defines the phased roadmap to turn Freehold from a working proof-of-con
 
 ### 2.2 SaaS Deployment
 
-**Decision:** Fly.io for backend + Postgres, Vercel for frontend. Shared database with Postgres Row Level Security for tenant isolation.
-**Why:** Fly.io supports region-selectable deploys (data sovereignty). Shared DB with RLS enforces isolation at the database level (same philosophy as revision immutability trigger). Vercel is the natural fit for Next.js.
-**Rejected:** Database-per-tenant (operationally expensive, doesn't scale cheaply at free tier), AWS/GCP (overkill at this stage), Railway (less regional control).
+**Decision:** Cloudflare Containers for backend, Cloudflare Pages for frontend, Neon for managed Postgres, Cloudflare R2 for attachment storage.
+**Why:** Fly.io no longer has a free tier; Cloudflare covers the full stack at zero cost during early growth. Single provider means one dashboard, one billing account, and co-located frontend + backend (lower API latency). R2's zero-egress model is a natural fit for the attachment-heavy export workflow. Shared DB with RLS enforces tenant isolation at the database level (same philosophy as the revision immutability trigger). Neon's serverless Postgres includes connection pooling, which is required for edge/container deployments.
+**Rejected:** Fly.io (no longer has a free tier; Cloudflare Containers achieves the same result at zero cost during beta), Vercel (replaced by Cloudflare Pages — same Next.js support, more generous free tier), database-per-tenant (operationally expensive, doesn't scale cheaply), AWS/GCP (overkill at this stage).
 
 **Implementation:**
 - Postgres RLS policies on all tables: `WHERE org_id = current_setting('app.current_org')`
 - Middleware sets `app.current_org` on every request from authenticated user's org
-- Fly.io deployment config (fly.toml, health checks, auto-scaling)
-- Vercel deployment for frontend
-- Local filesystem storage on Fly.io volume initially; S3 adapter later
-- CI/CD pipeline: GitHub Actions → deploy on merge to main
+- Cloudflare Containers deployment config (`api/wrangler.toml`, health checks)
+- Cloudflare Pages deployment for frontend (`web/wrangler.toml`, `@cloudflare/next-on-pages` adapter)
+- Neon database provisioned; `DATABASE_URL` points at Neon's pooled connection endpoint
+- `R2StorageAdapter` implementing `StorageAdapter` ABC using `boto3` against R2's S3-compatible endpoint
+- `STORAGE_BACKEND=r2` env var gates R2 vs. local filesystem (self-hosters keep `LocalFilesystemAdapter`)
+- CI/CD pipeline: GitHub Actions → build Docker image → push to GHCR → deploy via Wrangler on merge to main
 
 **Done when:**
-- SaaS instance running on Fly.io with RLS-enforced tenant isolation
-- Frontend deployed on Vercel
-- Region-selectable deployment documented
+- SaaS instance running on Cloudflare Containers with RLS-enforced tenant isolation
+- Frontend deployed on Cloudflare Pages
+- Attachment storage on Cloudflare R2 (zero egress)
+- Neon Postgres provisioned with connection pooling
 - Health monitoring and basic alerting in place
+- Region-selectable deployment documented
 
 ### 2.3 SaaS Pricing Tiers
 
@@ -325,7 +333,7 @@ This PRD defines the phased roadmap to turn Freehold from a working proof-of-con
 | E2EE key management model | Requires dedicated security review | Phase 3.1 |
 | Client-side search for encrypted workspaces | Depends on E2EE architecture | Phase 3.1 |
 | Self-hosted enterprise tier pricing | No data yet on what teams will pay for | Post-phase 2 |
-| S3 storage adapter timeline | Local filesystem on Fly.io volume works initially | Phase 2.2 (nice-to-have) |
+| S3/R2 storage adapter implementation | `StorageAdapter` ABC is ready; R2StorageAdapter ships with Phase 2.2 | Phase 2.2 |
 
 ---
 
