@@ -1,10 +1,12 @@
 """Workspace CRUD endpoints."""
 
 import os
+import tempfile
 from io import BytesIO
+from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -78,6 +80,43 @@ def create_workspace(
         db.rollback()
         raise HTTPException(status_code=409, detail=f"Workspace slug '{body.slug}' already exists")
     db.refresh(ws)
+    return ws
+
+
+@router.post("/restore", response_model=WorkspaceRead, status_code=201)
+async def restore_workspace_endpoint(
+    bundle: UploadFile,
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(verify_auth),
+):
+    """Restore a workspace from an uploaded export bundle zip."""
+    from ..restore import restore_workspace
+
+    if not bundle.filename or not bundle.filename.endswith(".zip"):
+        raise HTTPException(status_code=422, detail="Bundle must be a .zip file")
+
+    storage_root = os.getenv("STORAGE_PATH", "/var/lib/freehold/attachments")
+    storage = LocalFilesystemAdapter(storage_root)
+
+    data = await bundle.read()
+    with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
+        tmp.write(data)
+        tmp_path = Path(tmp.name)
+
+    try:
+        try:
+            slug = restore_workspace(tmp_path, db, storage)
+            db.commit()
+        except ValueError as e:
+            db.rollback()
+            raise HTTPException(status_code=409, detail=str(e))
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=422, detail=f"Failed to restore bundle: {e}")
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    ws = db.query(Workspace).filter_by(slug=slug).first()
     return ws
 
 

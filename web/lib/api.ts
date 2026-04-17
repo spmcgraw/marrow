@@ -100,6 +100,30 @@ export function exportWorkspaceUrl(workspaceId: string, slim: boolean): string {
   return `${base}/api/workspaces/${workspaceId}/export${params}`;
 }
 
+export async function restoreWorkspace(file: File): Promise<Workspace> {
+  const form = new FormData();
+  form.append("bundle", file);
+
+  const headers: Record<string, string> = API_KEY ? { "X-API-Key": API_KEY } : {};
+
+  const res = await fetch(`${BASE_URL}/api/workspaces/restore`, {
+    method: "POST",
+    body: form,
+    headers,
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    let detail = text;
+    try {
+      detail = JSON.parse(text).detail ?? text;
+    } catch {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
 // ---------------------------------------------------------------------------
 // Search
 // ---------------------------------------------------------------------------

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Settings } from "lucide-react";
 import { createWorkspace, getAuthStatus, listOrgs, listWorkspaces, logout, slugify } from "@/lib/api";
 import type { AuthStatus, Organization, Workspace } from "@/lib/types";
+import { RestoreDialog } from "@/components/restore-dialog";
 
 export default function WorkspacesPage() {
   const router = useRouter();
@@ -110,6 +111,8 @@ export default function WorkspacesPage() {
             Create
           </Button>
         </form>
+
+        <RestoreDialog />
       </div>
     </div>
   );

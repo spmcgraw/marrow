@@ -175,6 +175,7 @@ freehold/
 │   │   ├── app-sidebar.tsx           # Tree nav: Spaces → Collections → Pages + search
 │   │   ├── search-dialog.tsx         # Cmd+K search dialog
 │   │   ├── export-dialog.tsx         # Export workspace dialog (full / slim, size estimate)
+│   │   ├── restore-dialog.tsx        # Restore workspace from bundle dialog (drag-and-drop upload)
 │   │   ├── page-editor.tsx           # Title + markdown textarea, auto-save, attachments, revisions
 │   │   └── ui/                       # Shadcn/Base UI components
 │   ├── lib/
@@ -245,6 +246,7 @@ All routes are prefixed with `/api`. Authentication is enforced via session cook
 | GET | /api/workspaces/{id}/search?q= | Full-text search across workspace pages | viewer |
 | GET | /api/workspaces/{id}/export?slim=false | Download workspace as zip bundle | viewer |
 | GET | /api/workspaces/{id}/export/estimate | Pre-compression byte estimates for full & slim exports | viewer |
+| POST | /api/workspaces/restore | Restore a workspace from an uploaded export bundle zip | — |
 | GET/POST | /api/workspaces/{id}/spaces/ | List / create spaces | viewer/editor |
 | GET/DELETE | /api/workspaces/{id}/spaces/{sid} | Get / delete space | viewer/owner |
 | GET/POST | /api/spaces/{sid}/collections/ | List / create collections | viewer/editor |
