@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, FilePlus, FolderPlus, Plus, Settings } from "lucide-react";
 import { ExportDialog } from "@/components/export-dialog";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { toast } from "sonner";
 import {
   Sidebar,
@@ -182,9 +183,12 @@ function SpaceSection({
     <SidebarGroup>
       <div className="flex items-center justify-between group">
         <SidebarGroupLabel
-          className="flex-1 cursor-pointer"
+          className="flex flex-1 cursor-pointer items-center gap-2"
           onClick={() => setOpen((o) => !o)}
         >
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-primary/10 text-[10px] font-semibold text-primary">
+            {space.name[0]?.toUpperCase()}
+          </span>
           {space.name}
         </SidebarGroupLabel>
         <CreateDialog
@@ -280,9 +284,14 @@ export function AppSidebar({ tree, user }: Props) {
           />
         ))}
         {tree.spaces.length === 0 && (
-          <p className="px-4 py-3 text-xs text-muted-foreground">
-            No spaces yet — hover the workspace name and click + to create one.
-          </p>
+          <div className="px-4 py-6 text-center">
+            <p className="text-xs text-muted-foreground">
+              No spaces yet
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground/70">
+              Hover the workspace name above and click <strong>+</strong> to create one.
+            </p>
+          </div>
         )}
       </SidebarContent>
 
@@ -293,16 +302,19 @@ export function AppSidebar({ tree, user }: Props) {
               <p className="truncate text-sm font-medium">{user.name}</p>
               <p className="truncate text-xs text-muted-foreground">{user.email}</p>
             </div>
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={async () => {
-                const logoutUrl = await logout();
-                window.location.href = logoutUrl ?? "/login";
-              }}
-            >
-              Sign out
-            </Button>
+            <div className="flex items-center gap-1">
+              <ThemeToggle />
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={async () => {
+                  const logoutUrl = await logout();
+                  window.location.href = logoutUrl ?? "/login";
+                }}
+              >
+                Sign out
+              </Button>
+            </div>
           </div>
         </SidebarFooter>
       )}
