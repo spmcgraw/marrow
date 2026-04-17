@@ -27,6 +27,8 @@ from ..storage import LocalFilesystemAdapter
 
 router = APIRouter(prefix="/api/workspaces", tags=["workspaces"])
 
+_MAX_BUNDLE_BYTES = 500 * 1024 * 1024  # 500 MB
+
 
 @router.get("", response_model=list[WorkspaceRead])
 def list_workspaces(
@@ -95,7 +97,7 @@ async def restore_workspace_endpoint(
     storage_root = os.getenv("STORAGE_PATH", "/var/lib/freehold/attachments")
     storage = LocalFilesystemAdapter(storage_root)
 
-    _MAX_BUNDLE_BYTES = 500 * 1024 * 1024  # 500 MB
+    # Read one byte over the limit to distinguish "at limit" from "over limit"
     data = await bundle.read(_MAX_BUNDLE_BYTES + 1)
     if len(data) > _MAX_BUNDLE_BYTES:
         raise HTTPException(status_code=413, detail="Bundle exceeds maximum allowed size (500 MB)")
