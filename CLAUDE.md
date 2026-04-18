@@ -21,11 +21,11 @@ Current status: **v0.1 MVP** — core hierarchy, append-only revisions, export/r
 - **Backend**: FastAPI (Python 3.11+), located in `api/`
 - **Database**: PostgreSQL 16 (docker-compose maps to port 5433)
 - **Migrations**: Alembic
-- **Auth**: OIDC authentication (any IdP) with API key fallback — see `api/freehold/auth.py`
+- **Auth**: OIDC authentication (any IdP) with API key fallback — see `api/marrow/auth.py`
 - **Search**: PostgreSQL full-text search; Meilisearch/OpenSearch later
 - **Frontend**: Next.js 16 (React 19), located in `web/`
 - **Storage**: Pluggable adapter interface — local filesystem is the only current implementation
-- **CLI**: Typer (`freehold export` / `freehold restore`)
+- **CLI**: Typer (`marrow export` / `marrow restore`)
 
 ---
 
@@ -97,8 +97,8 @@ cd api && alembic upgrade head
 cd api && alembic downgrade -1
 
 # CLI (export/restore)
-cd api && freehold export --workspace <slug> --output <path>
-cd api && freehold restore <bundle.zip>
+cd api && marrow export --workspace <slug> --output <path>
+cd api && marrow restore <bundle.zip>
 
 # Frontend
 cd web && npm run dev
@@ -114,8 +114,8 @@ cd web && npm test
 ```text
 freehold/
 ├── api/                              # FastAPI backend
-│   ├── main.py                       # Entry point (re-exports app from freehold.app)
-│   ├── pyproject.toml                # Dependencies and CLI entry point
+│   ├── main.py                       # Entry point (re-exports app from marrow.app)
+│   ├── pyproject.toml                # Dependencies and CLI entry point (`marrow`)
 │   ├── alembic.ini
 │   ├── .env.example
 │   ├── alembic/
@@ -125,7 +125,7 @@ freehold/
 │   │       ├── 35eb203afc65_add_users_table.py
 │   │       ├── 0999ffe7b838_add_organizations_and_rbac.py
 │   │       └── c333d20a46d9_add_content_format_to_revisions.py
-│   ├── freehold/                     # Main package
+│   ├── marrow/                       # Main package
 │   │   ├── app.py                    # FastAPI app factory, CORS + session middleware
 │   │   ├── auth.py                   # OIDC config, session JWT helpers, cookie params
 │   │   ├── db.py                     # SQLAlchemy session management
@@ -324,7 +324,7 @@ Freehold supports three authentication methods, checked in priority order:
 
 These constraints are non-negotiable and must be respected in all contributions:
 
-1. **Restore guarantee**: `freehold restore <bundle.zip>` must reproduce a workspace exactly from any valid export bundle. A failing restore test is a critical bug.
+1. **Restore guarantee**: `marrow restore <bundle.zip>` must reproduce a workspace exactly from any valid export bundle. A failing restore test is a critical bug.
 2. **Append-only revisions**: saves always create new revisions; existing revisions are never modified or deleted. The database trigger enforces this — do not remove it.
 3. **Transparent export format**: export bundles must remain human-readable without tooling (Markdown + JSON, no proprietary blobs).
 4. **Pluggable storage**: business logic must not bypass the storage adapter interface. Never call filesystem APIs directly from routers or models.
