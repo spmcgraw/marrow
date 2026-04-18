@@ -1,5 +1,5 @@
 /**
- * Freehold API client.
+ * Marrow API client.
  *
  * All requests go through `apiFetch`, which attaches the API key header
  * and throws a descriptive error on non-2xx responses.

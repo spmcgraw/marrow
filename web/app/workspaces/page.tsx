@@ -44,7 +44,7 @@ export default function WorkspacesPage() {
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="font-heading text-3xl font-bold tracking-tight">Freehold</h1>
+            <h1 className="font-heading text-3xl font-bold tracking-tight">Marrow</h1>
             <p className="mt-1 text-sm text-muted-foreground">Your knowledge, owned outright.</p>
           </div>
           {auth?.authenticated && (

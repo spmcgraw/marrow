@@ -12,7 +12,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center">
       <div className="w-full max-w-sm space-y-6 text-center">
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold tracking-tight">Freehold</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Marrow</h1>
           <p className="text-muted-foreground text-sm">
             Sign in to access your workspace
           </p>

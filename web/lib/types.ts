@@ -1,4 +1,4 @@
-// TypeScript types mirroring the Freehold API Pydantic schemas.
+// TypeScript types mirroring the Marrow API Pydantic schemas.
 
 export interface Organization {
   id: string;

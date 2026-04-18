@@ -8,7 +8,7 @@ import "./globals.css";
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Freehold",
+  title: "Marrow",
   description: "Your knowledge, owned outright.",
 };
 
