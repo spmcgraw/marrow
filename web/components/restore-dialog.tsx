@@ -67,12 +67,14 @@ export function RestoreDialog() {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger render={<button type="button" className="contents" />}>
-        <Button variant="outline" type="button" className="w-full">
-          <Upload className="h-3.5 w-3.5 mr-1.5" />
-          Restore from bundle
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button variant="outline" type="button" className="w-full">
+            <Upload className="h-3.5 w-3.5 mr-1.5" />
+            Restore from bundle
+          </Button>
+        }
+      />
 
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
