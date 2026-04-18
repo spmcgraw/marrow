@@ -238,7 +238,7 @@ export function AppSidebar({ tree, user }: Props) {
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center justify-between px-2 py-1.5">
           <a href="/workspaces" className="text-sm font-semibold tracking-tight hover:opacity-70">
-            Freehold
+            Marrow
           </a>
           <SidebarTrigger className="-mr-1" />
         </div>

@@ -83,7 +83,7 @@ export function RestoreDialog() {
 
         <div className="space-y-4 py-1">
           <p className="text-sm text-muted-foreground">
-            Upload a Freehold export bundle (.zip) to restore a workspace. Full and slim bundles are
+            Upload a Marrow export bundle (.zip) to restore a workspace. Full and slim bundles are
             both supported.
           </p>
 
