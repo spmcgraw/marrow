@@ -17,10 +17,10 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from freehold.export import SCHEMA_VERSION
-from freehold.models import Attachment, Page, Revision, Workspace
-from freehold.restore import restore_workspace
-from freehold.storage import StorageAdapter
+from marrow.export import SCHEMA_VERSION
+from marrow.models import Attachment, Page, Revision, Workspace
+from marrow.restore import restore_workspace
+from marrow.storage import StorageAdapter
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://freehold:freehold@localhost:5433/freehold")
 

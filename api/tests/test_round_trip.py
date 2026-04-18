@@ -19,10 +19,10 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
 from alembic import command
-from freehold.export import export_workspace
-from freehold.models import Attachment, Collection, Organization, Page, Revision, Space, Workspace
-from freehold.restore import restore_workspace
-from freehold.storage import StorageAdapter
+from marrow.export import export_workspace
+from marrow.models import Attachment, Collection, Organization, Page, Revision, Space, Workspace
+from marrow.restore import restore_workspace
+from marrow.storage import StorageAdapter
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://freehold:freehold@localhost:5433/freehold")
 

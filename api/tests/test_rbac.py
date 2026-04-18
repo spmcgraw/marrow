@@ -6,8 +6,8 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from freehold.auth import COOKIE_NAME, create_session_jwt, reset_oidc_config
-from freehold.models import (
+from marrow.auth import COOKIE_NAME, create_session_jwt, reset_oidc_config
+from marrow.models import (
     Collection,
     Organization,
     OrgMembership,
@@ -34,7 +34,7 @@ def _clean_env(monkeypatch):
 
 @pytest.fixture
 def client():
-    from freehold.app import app
+    from marrow.app import app
 
     return TestClient(app, raise_server_exceptions=False)
 
@@ -98,7 +98,7 @@ class TestWorkspaceRBAC:
     """Test role enforcement on workspace endpoints."""
 
     def test_viewer_can_read_workspace(self, client):
-        from freehold.dependencies import get_db
+        from marrow.dependencies import get_db
 
         db = next(get_db())
         try:
@@ -115,7 +115,7 @@ class TestWorkspaceRBAC:
             client.cookies.clear()
 
     def test_non_member_cannot_read_workspace(self, client):
-        from freehold.dependencies import get_db
+        from marrow.dependencies import get_db
 
         db = next(get_db())
         try:
@@ -132,7 +132,7 @@ class TestWorkspaceRBAC:
             client.cookies.clear()
 
     def test_viewer_cannot_delete_workspace(self, client):
-        from freehold.dependencies import get_db
+        from marrow.dependencies import get_db
 
         db = next(get_db())
         try:
@@ -149,7 +149,7 @@ class TestWorkspaceRBAC:
             client.cookies.clear()
 
     def test_owner_can_delete_workspace(self, client):
-        from freehold.dependencies import get_db
+        from marrow.dependencies import get_db
 
         db = next(get_db())
         try:
@@ -167,7 +167,7 @@ class TestWorkspaceRBAC:
 
     def test_api_key_bypasses_rbac(self, client, monkeypatch):
         monkeypatch.setenv("API_KEY", "test-key")
-        from freehold.dependencies import get_db
+        from marrow.dependencies import get_db
 
         db = next(get_db())
         try:
@@ -183,7 +183,7 @@ class TestWorkspaceRBAC:
             db.rollback()
 
     def test_list_workspaces_scoped_to_user_orgs(self, client):
-        from freehold.dependencies import get_db
+        from marrow.dependencies import get_db
 
         db = next(get_db())
         try:
@@ -209,7 +209,7 @@ class TestEditorRole:
     """Test that editors can create/edit but not delete."""
 
     def test_editor_can_create_space(self, client):
-        from freehold.dependencies import get_db
+        from marrow.dependencies import get_db
 
         db = next(get_db())
         try:
@@ -229,7 +229,7 @@ class TestEditorRole:
             client.cookies.clear()
 
     def test_editor_cannot_delete_space(self, client):
-        from freehold.dependencies import get_db
+        from marrow.dependencies import get_db
 
         db = next(get_db())
         try:
@@ -246,7 +246,7 @@ class TestEditorRole:
             client.cookies.clear()
 
     def test_viewer_cannot_create_page(self, client):
-        from freehold.dependencies import get_db
+        from marrow.dependencies import get_db
 
         db = next(get_db())
         try:
@@ -266,7 +266,7 @@ class TestEditorRole:
             client.cookies.clear()
 
     def test_editor_can_update_page(self, client):
-        from freehold.dependencies import get_db
+        from marrow.dependencies import get_db
 
         db = next(get_db())
         try:

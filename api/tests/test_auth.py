@@ -7,14 +7,14 @@ import jwt
 import pytest
 from fastapi.testclient import TestClient
 
-from freehold.auth import (
+from marrow.auth import (
     COOKIE_NAME,
     create_session_jwt,
     decode_session_jwt,
     get_oidc_config,
     reset_oidc_config,
 )
-from freehold.dependencies import AuthContext, verify_auth
+from marrow.dependencies import AuthContext, verify_auth
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -209,7 +209,7 @@ class TestVerifyAuth:
 class TestAuthRouter:
     @pytest.fixture()
     def client(self):
-        from freehold.app import app
+        from marrow.app import app
 
         return TestClient(app, raise_server_exceptions=False)
 

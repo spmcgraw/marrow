@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from freehold.models import Collection, Organization, Page, Revision, Space, Workspace
+from marrow.models import Collection, Organization, Page, Revision, Space, Workspace
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://freehold:freehold@localhost:5433/freehold")
 

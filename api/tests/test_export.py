@@ -13,9 +13,9 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from freehold.export import SCHEMA_VERSION, estimate_export_sizes, export_workspace
-from freehold.models import Attachment, Collection, Organization, Page, Revision, Space, Workspace
-from freehold.storage import StorageAdapter
+from marrow.export import SCHEMA_VERSION, estimate_export_sizes, export_workspace
+from marrow.models import Attachment, Collection, Organization, Page, Revision, Space, Workspace
+from marrow.storage import StorageAdapter
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://freehold:freehold@localhost:5433/freehold")
 
@@ -275,7 +275,7 @@ def test_attachment_hash_mismatch_raises(seeded, session, tmp_path):
 
 
 def test_missing_workspace_raises(session, tmp_path):
-    from freehold.storage import LocalFilesystemAdapter
+    from marrow.storage import LocalFilesystemAdapter
 
     storage = LocalFilesystemAdapter("/tmp")
     with pytest.raises(ValueError, match="not found"):
@@ -351,7 +351,7 @@ def test_slim_bundle_is_restorable(session, tmp_path):
     """A slim bundle restores cleanly — one revision per page from pages/ content."""
     import uuid as _uuid
     from datetime import datetime, timezone
-    from freehold.restore import restore_workspace
+    from marrow.restore import restore_workspace
 
     now = datetime.now(timezone.utc).isoformat()
     ws_id = _uuid.uuid4()
@@ -398,7 +398,7 @@ def test_slim_bundle_is_restorable(session, tmp_path):
     slug = restore_workspace(bundle_path, session, storage)
     assert slug == "slim-restore-ws"
 
-    from freehold.models import Workspace
+    from marrow.models import Workspace
     restored_ws = session.query(Workspace).filter_by(slug="slim-restore-ws").one()
     pages_list = [p for s in restored_ws.spaces for c in s.collections for p in c.pages]
     assert len(pages_list) == 1

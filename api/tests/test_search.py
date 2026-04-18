@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
 from alembic import command
-from freehold.models import Collection, Organization, Page, Revision, Space, Workspace
+from marrow.models import Collection, Organization, Page, Revision, Space, Workspace
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://freehold:freehold@localhost:5433/freehold")
 
@@ -270,7 +270,7 @@ def test_title_matches_rank_higher_than_body(db):
 
 def test_backend_browse_empty_query_returns_all_pages(db):
     """An empty query should return all pages in the workspace (browse mode)."""
-    from freehold.search import PostgresSearchBackend
+    from marrow.search import PostgresSearchBackend
 
     ws, _, col = _seed_workspace(db)
     _create_page(db, col, "page-a", "Alpha", "First page content")
@@ -286,7 +286,7 @@ def test_backend_browse_empty_query_returns_all_pages(db):
 
 def test_backend_title_ilike_matches_partial_title(db):
     """A partial title query should match via ILIKE even if body lacks the word."""
-    from freehold.search import PostgresSearchBackend
+    from marrow.search import PostgresSearchBackend
 
     ws, _, col = _seed_workspace(db)
     _create_page(db, col, "getting-started", "Getting Started Guide", "Welcome to Freehold.")
