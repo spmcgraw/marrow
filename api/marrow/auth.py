@@ -117,7 +117,7 @@ def decode_session_jwt(token: str) -> dict:
 # Cookie helpers
 # ---------------------------------------------------------------------------
 
-COOKIE_NAME = "freehold_session"
+COOKIE_NAME = "marrow_session"
 
 
 def make_session_cookie_params() -> dict:

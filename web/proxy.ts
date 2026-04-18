@@ -16,7 +16,7 @@ export function proxy(request: NextRequest) {
   }
 
   // Check for session cookie (set by the backend with Domain=localhost or shared domain)
-  const session = request.cookies.get("freehold_session");
+  const session = request.cookies.get("marrow_session");
   if (!session) {
     return NextResponse.redirect(new URL("/login", request.url));
   }

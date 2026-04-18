@@ -88,7 +88,7 @@ def verify_auth(
     """Authenticate the request via session cookie, API key, or anonymous access.
 
     Priority:
-    1. Valid ``freehold_session`` cookie → session auth
+    1. Valid ``marrow_session`` cookie → session auth
     2. Valid ``X-API-Key`` header → API key auth
     3. Neither, but OIDC and API_KEY both unconfigured → anonymous (dev mode)
     4. Otherwise → 401

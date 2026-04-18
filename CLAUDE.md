@@ -298,7 +298,7 @@ Restore supports v1, v2, and v3 bundles.
 
 Freehold supports three authentication methods, checked in priority order:
 
-1. **OIDC session cookie** (`freehold_session`): A JWT signed with `SECRET_KEY` (HS256), issued after successful OIDC login. Contains `sub` (user UUID), `email`, `name`, with 24h expiry.
+1. **OIDC session cookie** (`marrow_session`): A JWT signed with `SECRET_KEY` (HS256), issued after successful OIDC login. Contains `sub` (user UUID), `email`, `name`, with 24h expiry.
 2. **API key** (`X-API-Key` header): Static key matching `API_KEY` env var. Used by CLI and scripts. **Bypasses all RBAC checks** (superuser equivalent).
 3. **Anonymous**: When neither OIDC nor API key is configured, all requests are allowed (dev mode). **Bypasses all RBAC checks**.
 

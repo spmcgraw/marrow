@@ -36,9 +36,9 @@ async function apiFetch<T>(
   if (typeof window === "undefined") {
     const { cookies } = await import("next/headers");
     const cookieStore = await cookies();
-    const session = cookieStore.get("freehold_session");
+    const session = cookieStore.get("marrow_session");
     if (session) {
-      headers["Cookie"] = `freehold_session=${session.value}`;
+      headers["Cookie"] = `marrow_session=${session.value}`;
     }
   }
 
