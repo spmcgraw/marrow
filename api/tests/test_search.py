@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from alembic import command
 from marrow.models import Collection, Organization, Page, Revision, Space, Workspace
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://freehold:freehold@localhost:5433/freehold")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://marrow:marrow@localhost:5433/marrow")
 
 
 # ---------------------------------------------------------------------------
@@ -35,7 +35,7 @@ def _alembic_cfg(url: str) -> Config:
 @pytest.fixture(scope="module")
 def db_url():
     """Create a fresh database, run migrations, yield URL, then drop it."""
-    db_name = f"freehold_search_{uuid.uuid4().hex[:8]}"
+    db_name = f"marrow_search_{uuid.uuid4().hex[:8]}"
 
     admin = psycopg2.connect(f"{_base_dsn()}/postgres")
     admin.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
@@ -289,7 +289,7 @@ def test_backend_title_ilike_matches_partial_title(db):
     from marrow.search import PostgresSearchBackend
 
     ws, _, col = _seed_workspace(db)
-    _create_page(db, col, "getting-started", "Getting Started Guide", "Welcome to Freehold.")
+    _create_page(db, col, "getting-started", "Getting Started Guide", "Welcome to Marrow.")
     _create_page(db, col, "unrelated", "API Reference", "Lists all endpoints.")
 
     backend = PostgresSearchBackend()

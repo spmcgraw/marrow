@@ -1,4 +1,4 @@
-"""Pydantic request/response schemas for the Freehold REST API."""
+"""Pydantic request/response schemas for the Marrow REST API."""
 
 from datetime import datetime
 from uuid import UUID

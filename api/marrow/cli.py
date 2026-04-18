@@ -1,11 +1,11 @@
-"""Freehold CLI entry point."""
+"""Marrow CLI entry point."""
 
 from pathlib import Path
 
 import typer
 from dotenv import load_dotenv
 
-app = typer.Typer(help="Freehold — self-hosted knowledge base tools.")
+app = typer.Typer(help="Marrow — self-hosted knowledge base tools.")
 
 
 @app.command()
@@ -33,7 +33,7 @@ def export(
     from .export import export_workspace
     from .storage import LocalFilesystemAdapter
 
-    storage_root = storage_path or os.getenv("STORAGE_PATH", "/var/lib/freehold/attachments")
+    storage_root = storage_path or os.getenv("STORAGE_PATH", "/var/lib/marrow/attachments")
     storage = LocalFilesystemAdapter(storage_root)
 
     try:
@@ -73,7 +73,7 @@ def restore(
     from .restore import restore_workspace
     from .storage import LocalFilesystemAdapter
 
-    storage_root = storage_path or os.getenv("STORAGE_PATH", "/var/lib/freehold/attachments")
+    storage_root = storage_path or os.getenv("STORAGE_PATH", "/var/lib/marrow/attachments")
     storage = LocalFilesystemAdapter(storage_root)
 
     try:

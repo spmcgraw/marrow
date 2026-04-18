@@ -1,4 +1,4 @@
-"""Role-based access control dependencies for Freehold.
+"""Role-based access control dependencies for Marrow.
 
 Provides dependency factories that enforce org membership and role requirements
 on API routes. API key and anonymous auth bypass all role checks for backward

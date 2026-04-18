@@ -16,7 +16,7 @@ from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 from alembic import command
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://freehold:freehold@localhost:5433/freehold")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://marrow:marrow@localhost:5433/marrow")
 
 
 def _base_dsn() -> str:
@@ -35,7 +35,7 @@ def _alembic_cfg(url: str) -> Config:
 @pytest.fixture(scope="module")
 def db_url():
     """Create a fresh database for the module, yield its URL, then drop it."""
-    db_name = f"freehold_test_{uuid.uuid4().hex[:8]}"
+    db_name = f"marrow_test_{uuid.uuid4().hex[:8]}"
 
     admin = psycopg2.connect(f"{_base_dsn()}/postgres")
     admin.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
@@ -155,7 +155,7 @@ class TestMigrationCycle:
             tables = {row[0] for row in cur.fetchall()}
         conn.close()
 
-        freehold_tables = {
+        marrow_tables = {
             "workspaces",
             "spaces",
             "collections",
@@ -163,4 +163,4 @@ class TestMigrationCycle:
             "revisions",
             "attachments",
         }
-        assert not freehold_tables & tables
+        assert not marrow_tables & tables

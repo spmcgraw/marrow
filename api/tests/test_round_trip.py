@@ -24,7 +24,7 @@ from marrow.models import Attachment, Collection, Organization, Page, Revision, 
 from marrow.restore import restore_workspace
 from marrow.storage import StorageAdapter
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://freehold:freehold@localhost:5433/freehold")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://marrow:marrow@localhost:5433/marrow")
 
 
 # ---------------------------------------------------------------------------
@@ -68,7 +68,7 @@ def _alembic_cfg(url: str) -> Config:
 @pytest.fixture(scope="module")
 def db_url():
     """Create a fresh database, run migrations, yield URL, then drop it."""
-    db_name = f"freehold_roundtrip_{uuid.uuid4().hex[:8]}"
+    db_name = f"marrow_roundtrip_{uuid.uuid4().hex[:8]}"
 
     admin = psycopg2.connect(f"{_base_dsn()}/postgres")
     admin.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)

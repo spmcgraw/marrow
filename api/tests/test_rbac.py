@@ -19,7 +19,7 @@ from marrow.models import (
     Workspace,
 )
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://freehold:freehold@localhost:5433/freehold")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://marrow:marrow@localhost:5433/marrow")
 
 
 @pytest.fixture(autouse=True)

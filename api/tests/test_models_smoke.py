@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from marrow.models import Collection, Organization, Page, Revision, Space, Workspace
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://freehold:freehold@localhost:5433/freehold")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://marrow:marrow@localhost:5433/marrow")
 
 
 @pytest.fixture(scope="module")
@@ -46,7 +46,7 @@ def test_create_workspace_hierarchy(session):
     session.add(page)
     session.flush()
 
-    revision = Revision(page_id=page.id, content="Hello, Freehold.")
+    revision = Revision(page_id=page.id, content="Hello, Marrow.")
     session.add(revision)
     session.flush()
 

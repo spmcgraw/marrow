@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Freehold is a self-hosted, open-source knowledge base (wiki) built around a non-negotiable **restore guarantee**: a Freehold export bundle must always be restorable to an exact replica of the original workspace. This guarantee is the architectural foundation — every decision flows from it.
+Marrow (repo still named `freehold` on disk during the rebrand) is a self-hosted, open-source knowledge base (wiki) built around a non-negotiable **restore guarantee**: a Marrow export bundle must always be restorable to an exact replica of the original workspace. This guarantee is the architectural foundation — every decision flows from it.
 
 Current status: **v0.1 MVP** — core hierarchy, append-only revisions, export/restore, file attachments, and a working Next.js frontend are all implemented and tested.
 
@@ -55,7 +55,7 @@ npm run dev                       # starts on http://localhost:3000
 **Backend (`api/.env`)**:
 
 ```env
-DATABASE_URL=postgresql://freehold:freehold@localhost:5433/freehold
+DATABASE_URL=postgresql://marrow:marrow@localhost:5433/marrow
 SECRET_KEY=changeme
 STORAGE_PATH=./storage       # resolves relative to api/ directory
 API_KEY=                     # optional; if set, enforces X-API-Key header on all routes
@@ -274,8 +274,8 @@ class StorageAdapter(ABC):
 ### Export Bundle Format
 
 ```
-freehold-export-{workspace-slug}-{timestamp}.zip          # full
-freehold-export-{workspace-slug}-slim-{timestamp}.zip     # slim
+marrow-export-{workspace-slug}-{timestamp}.zip          # full
+marrow-export-{workspace-slug}-slim-{timestamp}.zip     # slim
 ├── manifest.json        # workspace + org metadata, all entity IDs, schema version (v3)
 ├── pages/
 │   ├── {page-id}.md     # human-readable Markdown (all pages)
@@ -292,11 +292,11 @@ freehold-export-{workspace-slug}-slim-{timestamp}.zip     # slim
 v1/v2 bundles had only `.md` files. v3 adds `.json` as canonical for JSON-format revisions.
 Restore supports v1, v2, and v3 bundles.
 
-**Slim bundles** omit the `revisions/` directory entirely and set `"slim": true` + `"revisions": []` in `manifest.json`. Restore recreates one revision per page from `pages/` content. CLI: `freehold export --slim`; API: `?slim=true`.
+**Slim bundles** omit the `revisions/` directory entirely and set `"slim": true` + `"revisions": []` in `manifest.json`. Restore recreates one revision per page from `pages/` content. CLI: `marrow export --slim`; API: `?slim=true`.
 
 ### Authentication
 
-Freehold supports three authentication methods, checked in priority order:
+Marrow supports three authentication methods, checked in priority order:
 
 1. **OIDC session cookie** (`marrow_session`): A JWT signed with `SECRET_KEY` (HS256), issued after successful OIDC login. Contains `sub` (user UUID), `email`, `name`, with 24h expiry.
 2. **API key** (`X-API-Key` header): Static key matching `API_KEY` env var. Used by CLI and scripts. **Bypasses all RBAC checks** (superuser equivalent).

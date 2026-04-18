@@ -14,7 +14,7 @@ _cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 
 _secret_key = os.getenv("SECRET_KEY", "changeme")
 
-app = FastAPI(title="Freehold API", version="0.1.0")
+app = FastAPI(title="Marrow API", version="0.1.0")
 
 # SessionMiddleware is required by authlib for OAuth state management.
 app.add_middleware(SessionMiddleware, secret_key=_secret_key)

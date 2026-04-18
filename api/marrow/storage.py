@@ -36,5 +36,5 @@ class LocalFilesystemAdapter(StorageAdapter):
 
 
 def get_default_adapter() -> StorageAdapter:
-    storage_path = os.getenv("STORAGE_PATH", "/var/lib/freehold/attachments")
+    storage_path = os.getenv("STORAGE_PATH", "/var/lib/marrow/attachments")
     return LocalFilesystemAdapter(storage_path)

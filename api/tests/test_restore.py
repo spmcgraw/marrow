@@ -22,7 +22,7 @@ from marrow.models import Attachment, Page, Revision, Workspace
 from marrow.restore import restore_workspace
 from marrow.storage import StorageAdapter
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://freehold:freehold@localhost:5433/freehold")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://marrow:marrow@localhost:5433/marrow")
 
 
 # ---------------------------------------------------------------------------

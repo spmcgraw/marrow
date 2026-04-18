@@ -200,7 +200,7 @@ async def logout(request: Request):
         except Exception:
             pass
 
-    # Clear the Freehold session cookie
+    # Clear the Marrow session cookie
     body: dict = {"status": "ok"}
     response = JSONResponse(content=body)
     response.delete_cookie(

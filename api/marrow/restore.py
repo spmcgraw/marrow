@@ -1,7 +1,7 @@
 """Restore a workspace from an export bundle.
 
 Usage:
-    freehold restore <bundle.zip>
+    marrow restore <bundle.zip>
 """
 
 import hashlib
@@ -41,7 +41,7 @@ def restore_workspace(
     with zipfile.ZipFile(bundle_path) as zf:
         names = set(zf.namelist())
         if "manifest.json" not in names:
-            raise ValueError(f"Not a valid Freehold bundle: manifest.json missing in {bundle_path}")
+            raise ValueError(f"Not a valid Marrow bundle: manifest.json missing in {bundle_path}")
 
         manifest = json.loads(zf.read("manifest.json"))
 

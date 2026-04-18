@@ -1,4 +1,4 @@
-"""SQLAlchemy 2.0 ORM models for the Freehold core schema.
+"""SQLAlchemy 2.0 ORM models for the Marrow core schema.
 
 These models mirror the Alembic migration exactly, including:
 - Server-side UUID primary keys (gen_random_uuid())

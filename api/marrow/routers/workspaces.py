@@ -94,7 +94,7 @@ async def restore_workspace_endpoint(
     """Restore a workspace from an uploaded export bundle zip."""
     from ..restore import restore_workspace
 
-    storage_root = os.getenv("STORAGE_PATH", "/var/lib/freehold/attachments")
+    storage_root = os.getenv("STORAGE_PATH", "/var/lib/marrow/attachments")
     storage = LocalFilesystemAdapter(storage_root)
 
     # Read one byte over the limit to distinguish "at limit" from "over limit"
@@ -181,7 +181,7 @@ def estimate_workspace_export(
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    storage_root = os.getenv("STORAGE_PATH", "/var/lib/freehold/attachments")
+    storage_root = os.getenv("STORAGE_PATH", "/var/lib/marrow/attachments")
     storage = LocalFilesystemAdapter(storage_root)
 
     return estimate_export_sizes(slug=ws.slug, session=db, storage=storage)
@@ -202,7 +202,7 @@ def export_workspace_endpoint(
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
 
-    storage_root = os.getenv("STORAGE_PATH", "/var/lib/freehold/attachments")
+    storage_root = os.getenv("STORAGE_PATH", "/var/lib/marrow/attachments")
     storage = LocalFilesystemAdapter(storage_root)
 
     import tempfile

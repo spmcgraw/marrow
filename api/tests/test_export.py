@@ -17,7 +17,7 @@ from marrow.export import SCHEMA_VERSION, estimate_export_sizes, export_workspac
 from marrow.models import Attachment, Collection, Organization, Page, Revision, Space, Workspace
 from marrow.storage import StorageAdapter
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://freehold:freehold@localhost:5433/freehold")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://marrow:marrow@localhost:5433/marrow")
 
 
 # ---------------------------------------------------------------------------
@@ -294,7 +294,7 @@ def test_output_filename_default(seeded, session, tmp_path):
         storage=seeded["storage"],
         output_path=tmp_path,
     )
-    assert result.name.startswith("freehold-export-export-test-ws-")
+    assert result.name.startswith("marrow-export-export-test-ws-")
     assert result.name.endswith(".zip")
 
 

@@ -1,7 +1,7 @@
 """Export a workspace to a portable zip bundle.
 
 Bundle layout (schema v3):
-    freehold-export-{workspace-slug}-{timestamp}.zip
+    marrow-export-{workspace-slug}-{timestamp}.zip
     ├── manifest.json
     ├── pages/{page-id}.json          # canonical BlockNote JSON (v3 only, format='json')
     ├── pages/{page-id}.md            # human-readable Markdown (all versions)
@@ -362,7 +362,7 @@ def export_workspace(
     export_timestamp = datetime.now(timezone.utc).isoformat()
     timestamp_fmt = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     slim_suffix = "-slim" if slim else ""
-    bundle_name = f"freehold-export-{workspace.slug}{slim_suffix}-{timestamp_fmt}.zip"
+    bundle_name = f"marrow-export-{workspace.slug}{slim_suffix}-{timestamp_fmt}.zip"
 
     if output_path is None:
         output_path = Path.cwd() / bundle_name
