@@ -206,6 +206,22 @@ def test_restore_creates_workspace(session, storage, tmp_path):
     assert str(ws.id) == manifest["workspace"]["id"]
 
 
+def test_restore_accepts_legacy_freehold_prefixed_bundle(session, storage, tmp_path):
+    # Restore is manifest-driven, not filename-driven — legacy bundles produced
+    # before the freehold → marrow rename must still restore cleanly.
+    bundle_bytes, manifest = _make_bundle(ws_slug="legacy-prefix-ws")
+    path = _write_bundle(
+        tmp_path, bundle_bytes, name="freehold-export-legacy-prefix-ws-20251231T000000Z.zip"
+    )
+
+    slug = restore_workspace(path, session, storage)
+
+    assert slug == "legacy-prefix-ws"
+    ws = session.query(Workspace).filter_by(slug="legacy-prefix-ws").first()
+    assert ws is not None
+    assert str(ws.id) == manifest["workspace"]["id"]
+
+
 def test_restore_preserves_full_hierarchy(session, storage, tmp_path):
     bundle_bytes, manifest = _make_bundle(ws_slug="restore-hierarchy-ws")
     path = _write_bundle(tmp_path, bundle_bytes)
