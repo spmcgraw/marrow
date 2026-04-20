@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Marrow (repo still named `freehold` on disk during the rebrand) is a self-hosted, open-source knowledge base (wiki) built around a non-negotiable **restore guarantee**: a Marrow export bundle must always be restorable to an exact replica of the original workspace. This guarantee is the architectural foundation — every decision flows from it.
+Marrow is a self-hosted, open-source knowledge base (wiki) built around a non-negotiable **restore guarantee**: a Marrow export bundle must always be restorable to an exact replica of the original workspace. This guarantee is the architectural foundation — every decision flows from it.
 
 Current status: **v0.1 MVP** — core hierarchy, append-only revisions, export/restore, file attachments, and a working Next.js frontend are all implemented and tested.
 
@@ -112,7 +112,7 @@ cd web && npm test
 ## Repository Layout
 
 ```text
-freehold/
+marrow/
 ├── api/                              # FastAPI backend
 │   ├── main.py                       # Entry point (re-exports app from marrow.app)
 │   ├── pyproject.toml                # Dependencies and CLI entry point (`marrow`)
