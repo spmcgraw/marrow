@@ -1,9 +1,6 @@
 import { redirect } from "next/navigation";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import { InsetHeader } from "@/components/inset-header";
-import { WorkspaceTreeProvider } from "@/components/workspace-tree-context";
-import { getAuthStatus, getWorkspaceTree } from "@/lib/api";
+import { WorkspaceShell } from "@/components/workspace-shell";
+import { getAuthStatus, getWorkspaceTree, listOrgMembers } from "@/lib/api";
 
 interface Props {
   children: React.ReactNode;
@@ -24,14 +21,12 @@ export default async function WorkspaceLayout({ children, params }: Props) {
   }
 
   const auth = await getAuthStatus().catch(() => null);
+  const members = await listOrgMembers(tree.org_id).catch(() => null);
+  const memberCount = members ? members.length : null;
 
   return (
-    <SidebarProvider>
-      <AppSidebar tree={tree} user={auth?.user ?? null} />
-      <SidebarInset>
-        <InsetHeader />
-        <WorkspaceTreeProvider tree={tree}>{children}</WorkspaceTreeProvider>
-      </SidebarInset>
-    </SidebarProvider>
+    <WorkspaceShell tree={tree} user={auth?.user ?? null} memberCount={memberCount}>
+      {children}
+    </WorkspaceShell>
   );
 }

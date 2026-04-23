@@ -83,6 +83,10 @@
   --sidebar-border: #c8d0e0;
   --sidebar-ring: #9a3412;
   --color-accent-brand: #9a3412;
+  --color-accent-ink: #ffffff;
+  --color-text-muted: #94a3b8;
+  --color-cream: #f5ecd9;
+  --color-bone: #ece3d0;
   --color-warning: #d4900a;
   --color-success: #34d399;
 }
@@ -121,6 +125,10 @@
   --sidebar-border: #2d3348;
   --sidebar-ring: #e8805c;
   --color-accent-brand: #e8805c;
+  --color-accent-ink: #1a0f0a;
+  --color-text-muted: #475569;
+  --color-cream: #f5ecd9;
+  --color-bone: #ece3d0;
   --color-warning: #d4900a;
   --color-success: #34d399;
 }
