@@ -48,6 +48,13 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Font stacks as real CSS variables (the @theme inline block above registers
+ * them as Tailwind tokens but does not emit them on :root, so inline styles
+ * like `font-family: var(--font-heading)` would otherwise resolve to nothing). */
+:root {
+  --font-heading: var(--font-fraunces), ui-serif, Georgia, serif;
+}
+
 /* Light mode — design tokens from docs/design-tokens.md */
 :root {
   --background: #dde3ee;
@@ -83,6 +90,10 @@
   --sidebar-border: #c8d0e0;
   --sidebar-ring: #9a3412;
   --color-accent-brand: #9a3412;
+  --color-accent-ink: #ffffff;
+  --color-text-muted: #94a3b8;
+  --color-cream: #f5ecd9;
+  --color-bone: #ece3d0;
   --color-warning: #d4900a;
   --color-success: #34d399;
 }
@@ -121,6 +132,10 @@
   --sidebar-border: #2d3348;
   --sidebar-ring: #e8805c;
   --color-accent-brand: #e8805c;
+  --color-accent-ink: #1a0f0a;
+  --color-text-muted: #475569;
+  --color-cream: #f5ecd9;
+  --color-bone: #ece3d0;
   --color-warning: #d4900a;
   --color-success: #34d399;
 }
@@ -130,9 +145,85 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
   }
-  html {
-    @apply font-sans;
-  }
+}
+
+/* ---------------------------------------------------------------------------
+ * BlockNote editor restyle (Phase A design tokens)
+ * ------------------------------------------------------------------------- */
+
+/* Seat the editor on the page background so the typing area doesn't read as
+ * a banded surface distinct from the surrounding page. */
+.bn-container {
+  --bn-colors-editor-background: transparent;
+  --bn-colors-editor-text: var(--foreground);
+}
+.bn-container .bn-editor,
+.bn-container .ProseMirror {
+  background-color: transparent;
+  color: var(--foreground);
+}
+
+/* WikiLinks — page mentions and internal links render as dashed, accent-colored
+ * underlines so they're visually distinct from plain external links. */
+.bn-container a[href*="/pages/"],
+.bn-container a[href^="/w/"] {
+  color: var(--primary);
+  text-decoration: underline dashed;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+/* Task list checkboxes — squarer, more prominent, brand-colored. */
+.bn-container [data-content-type="checkListItem"] input[type="checkbox"] {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  margin-top: 3px;
+  position: relative;
+}
+.bn-container [data-content-type="checkListItem"] input[type="checkbox"]:checked {
+  border-color: var(--color-success, #34d399);
+  background: color-mix(in oklab, var(--color-success, #34d399) 18%, transparent);
+}
+.bn-container [data-content-type="checkListItem"] input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  background: var(--color-success, #34d399);
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' d='M3 8l3 3 7-7'/></svg>") no-repeat center / contain;
+}
+
+/* Code block chrome — `shell · copy` header bar. BlockNote wraps code in
+ * [data-content-type="codeBlock"]; we add a pseudo-element as the chrome. */
+.bn-container [data-content-type="codeBlock"] {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card);
+  padding-top: 30px !important;
+}
+.bn-container [data-content-type="codeBlock"]::before {
+  content: "shell · copy";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
+  letter-spacing: 0.02em;
+  background: var(--card);
+  pointer-events: none;
 }

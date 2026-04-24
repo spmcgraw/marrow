@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
-import { Inter, Fraunces } from "next/font/google";
+import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
-const fraunces = Fraunces({
+// Self-hosted Fraunces variable font — includes all four axes (wght, opsz,
+// SOFT, WONK) in a single file so `font-variation-settings` is reliable.
+const fraunces = localFont({
+  src: "../public/fonts/Fraunces.ttf",
   variable: "--font-fraunces",
-  subsets: ["latin"],
-  axes: ["SOFT", "WONK", "opsz"],
   display: "swap",
 });
 

@@ -26,16 +26,18 @@ import {
   createCodeBlockSpec,
   defaultBlockSpecs,
 } from "@blocknote/core";
+import { filterSuggestionItems } from "@blocknote/core/extensions";
 import {
   SuggestionMenuController,
   TableHandlesController,
+  getDefaultReactSlashMenuItems,
   useCreateBlockNote,
   type DefaultReactSuggestionItem,
 } from "@blocknote/react";
+import { calloutBlockSpec, calloutSlashMenuItem } from "@/components/editor/callout-block";
 import { BlockNoteView } from "@blocknote/mantine";
 import { createHighlighter } from "shiki";
-import { PageBreadcrumbs } from "@/components/page-breadcrumbs";
-import { Clock, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -46,16 +48,18 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { EditorHeader } from "@/components/inset-header";
+import { SideDrawer, type SideDrawerKind } from "@/components/side-drawer";
+import { CommentsDrawer } from "@/components/comments-drawer";
+import { CommentBubbleFab } from "@/components/comment-bubble-fab";
 import {
   attachmentFileUrl,
-  getRevision,
   listAttachments,
-  listRevisions,
   searchWorkspace,
   updatePage,
   uploadAttachment,
 } from "@/lib/api";
-import type { Attachment, Page, Revision } from "@/lib/types";
+import type { Attachment, Page } from "@/lib/types";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -91,6 +95,7 @@ const schema = BlockNoteSchema.create({
         }),
       defaultLanguage: "text",
     }),
+    callout: calloutBlockSpec(),
   },
 });
 
@@ -122,32 +127,37 @@ export function PageEditor({ initialPage }: Props) {
 
   const editor = useCreateBlockNote({ schema });
 
-  // Load initial content — JSON (new format) or Markdown (legacy)
+  // Load initial content — JSON (new format) or Markdown (legacy).
+  // Deferred to a microtask so BlockNote's internal flushSync doesn't fire
+  // while React is still committing the initial render (React 19).
   useEffect(() => {
     const content = initialPage.content;
     if (!content) return;
 
-    isInitializingRef.current = true;
-
-    const fmt = initialPage.content_format ?? "markdown";
-    if (fmt === "json") {
+    let cancelled = false;
+    queueMicrotask(async () => {
+      if (cancelled) return;
+      isInitializingRef.current = true;
+      const fmt = initialPage.content_format ?? "markdown";
       try {
-        const blocks = JSON.parse(content);
-        editor.replaceBlocks(editor.document, blocks);
+        if (fmt === "json") {
+          const blocks = JSON.parse(content);
+          editor.replaceBlocks(editor.document, blocks);
+        } else {
+          const blocks = await editor.tryParseMarkdownToBlocks(content);
+          editor.replaceBlocks(editor.document, blocks);
+        }
         pendingContentRef.current = content;
       } catch {
-        // Malformed JSON: fall back to showing raw text
         pendingContentRef.current = content;
+      } finally {
+        isInitializingRef.current = false;
       }
-    } else {
-      // Legacy Markdown: parse into blocks
-      const blocks = editor.tryParseMarkdownToBlocks(content);
-      editor.replaceBlocks(editor.document, blocks);
-      // On first save this will be re-serialized as JSON
-      pendingContentRef.current = content;
-    }
+    });
 
-    isInitializingRef.current = false;
+    return () => {
+      cancelled = true;
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveNow = useCallback(async () => {
@@ -252,26 +262,43 @@ export function PageEditor({ initialPage }: Props) {
     error: "Error saving",
   }[status];
 
+  const [sideDrawer, setSideDrawer] = useState<SideDrawerKind | null>(null);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+
+  function handleOpenDrawer(which: SideDrawerKind) {
+    setCommentsOpen(false);
+    setSideDrawer(which);
+  }
+
+  function handleShareStub() {
+    toast.info("Sharing lands with #40");
+  }
+
   return (
-    <div className="flex h-full flex-col">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between border-b px-6 py-2">
-        <div className="flex items-center gap-3">
-          <PageBreadcrumbs collectionId={initialPage.collection_id} />
-          {statusLabel && (
-            <span className="text-xs text-muted-foreground">{statusLabel}</span>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <AttachmentSheet pageId={initialPage.id} collectionId={initialPage.collection_id} />
-          <RevisionSheet pageId={initialPage.id} onRestore={handleRestore} />
-        </div>
+    <div className="relative flex h-full flex-col">
+      <EditorHeader
+        collectionId={initialPage.collection_id}
+        pageTitle={title || "Untitled"}
+        saveLabel={statusLabel}
+        onOpenDrawer={handleOpenDrawer}
+        onShare={handleShareStub}
+      />
+
+      {/* Attachments — retained while Phase A omits an Attachments menu entry */}
+      <div className="flex items-center border-b border-border px-6 py-1.5">
+        <AttachmentSheet pageId={initialPage.id} collectionId={initialPage.collection_id} />
       </div>
 
       {/* Title */}
-      <div className="px-8 pt-8 pb-2">
+      <div className="px-10 pt-14 pb-2">
         <input
-          className="w-full bg-transparent text-3xl font-bold outline-none placeholder:text-muted-foreground"
+          className="w-full bg-transparent font-heading outline-none placeholder:text-muted-foreground"
+          style={{
+            fontSize: 40,
+            fontWeight: 400,
+            letterSpacing: "-0.015em",
+            fontVariationSettings: '"SOFT" 60',
+          }}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={saveNow}
@@ -290,6 +317,17 @@ export function PageEditor({ initialPage }: Props) {
           {/* Table drag handles */}
           <TableHandlesController />
 
+          {/* Slash menu — default items + callout */}
+          <SuggestionMenuController
+            triggerCharacter="/"
+            getItems={async (query) =>
+              filterSuggestionItems(
+                [...getDefaultReactSlashMenuItems(editor), calloutSlashMenuItem(editor)],
+                query,
+              )
+            }
+          />
+
           {/* @-mention suggestion menu for page links */}
           <SuggestionMenuController
             triggerCharacter="@"
@@ -297,123 +335,22 @@ export function PageEditor({ initialPage }: Props) {
           />
         </BlockNoteView>
       </div>
+
+      {!commentsOpen && (
+        <CommentBubbleFab onClick={() => { setSideDrawer(null); setCommentsOpen(true); }} />
+      )}
+
+      {sideDrawer && (
+        <SideDrawer
+          which={sideDrawer}
+          pageId={initialPage.id}
+          onClose={() => setSideDrawer(null)}
+          onRestore={handleRestore}
+        />
+      )}
+
+      {commentsOpen && <CommentsDrawer onClose={() => setCommentsOpen(false)} />}
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Revision history panel
-// ---------------------------------------------------------------------------
-
-function RevisionSheet({
-  pageId,
-  onRestore,
-}: {
-  pageId: string;
-  onRestore: (content: string, contentFormat: string) => Promise<void>;
-}) {
-  const [revisions, setRevisions] = useState<Revision[]>([]);
-  const [selected, setSelected] = useState<Revision | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  async function load() {
-    setLoading(true);
-    try {
-      const revs = await listRevisions(pageId);
-      setRevisions(revs);
-    } catch {
-      toast.error("Failed to load revisions");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function selectRevision(rev: Revision) {
-    try {
-      const detail = await getRevision(pageId, rev.id);
-      setSelected(detail);
-    } catch {
-      toast.error("Failed to load revision content");
-    }
-  }
-
-  /** Display content for the preview pane — JSON is pretty-printed. */
-  function previewText(rev: Revision): string {
-    if (!rev.content) return "";
-    if (rev.content_format === "json") {
-      try {
-        return JSON.stringify(JSON.parse(rev.content), null, 2);
-      } catch {
-        return rev.content;
-      }
-    }
-    return rev.content;
-  }
-
-  return (
-    <Sheet onOpenChange={(open) => open && load()}>
-      <SheetTrigger render={<Button variant="ghost" size="sm" />}>
-        <Clock className="mr-1 h-4 w-4" />
-        History
-      </SheetTrigger>
-      <SheetContent className="flex flex-col gap-0 p-0 sm:max-w-lg">
-        <SheetHeader className="border-b px-4 py-3">
-          <SheetTitle>Revision History</SheetTitle>
-        </SheetHeader>
-        <div className="flex flex-1 overflow-hidden">
-          {/* Revision list */}
-          <ScrollArea className="w-44 border-r">
-            {loading && <p className="px-3 py-2 text-xs text-muted-foreground">Loading…</p>}
-            {revisions.map((rev, i) => (
-              <button
-                key={rev.id}
-                onClick={() => selectRevision(rev)}
-                className={`w-full px-3 py-2 text-left text-xs hover:bg-accent ${
-                  selected?.id === rev.id ? "bg-accent" : ""
-                }`}
-              >
-                <p className="font-medium">{i === 0 ? "Current" : `Rev ${revisions.length - i}`}</p>
-                <p className="text-muted-foreground">
-                  {new Date(rev.created_at).toLocaleString()}
-                </p>
-                <p className="text-muted-foreground uppercase tracking-wide" style={{ fontSize: "10px" }}>
-                  {rev.content_format}
-                </p>
-              </button>
-            ))}
-          </ScrollArea>
-
-          {/* Preview */}
-          <div className="flex flex-1 flex-col overflow-hidden">
-            {selected ? (
-              <>
-                <ScrollArea className="flex-1 p-3">
-                  <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed">
-                    {previewText(selected)}
-                  </pre>
-                </ScrollArea>
-                <div className="border-t p-3">
-                  <Button
-                    size="sm"
-                    className="w-full"
-                    onClick={async () => {
-                      await onRestore(selected.content!, selected.content_format);
-                      toast.success("Revision restored — save to confirm");
-                    }}
-                  >
-                    Restore this revision
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <p className="p-3 text-xs text-muted-foreground">
-                Select a revision to preview it.
-              </p>
-            )}
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
   );
 }
 

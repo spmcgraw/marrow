@@ -4,20 +4,14 @@ import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, FilePlus, FolderPlus, Plus, Settings } from "lucide-react";
 import { ExportDialog } from "@/components/export-dialog";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { toast } from "sonner";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import {
   Dialog,
@@ -29,18 +23,21 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { createCollection, createPage, createSpace, logout, slugify } from "@/lib/api";
-import { SearchDialog } from "@/components/search-dialog";
+import { createCollection, createPage, createSpace, slugify } from "@/lib/api";
+import { SearchPanel } from "@/components/rail-panels/search-panel";
+import { StarredPanel } from "@/components/rail-panels/starred-panel";
+import { InboxPanel } from "@/components/rail-panels/inbox-panel";
+import type { RailPanel } from "@/components/app-rail";
 import type { CollectionTreeItem, SpaceTreeItem, User, WorkspaceTree } from "@/lib/types";
 
 interface Props {
   tree: WorkspaceTree;
   user?: User | null;
+  panel: RailPanel;
+  memberCount: number | null;
+  searchInputRef: React.RefObject<HTMLInputElement | null>;
 }
 
-// Simple modal form used for Space, Collection, and Page creation.
-// Uses plain buttons as triggers since shadcn v4 (Base UI) uses the `render` prop
-// pattern rather than `asChild` for composing triggers.
 function CreateDialog({
   trigger,
   title,
@@ -73,7 +70,6 @@ function CreateDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      {/* Wrap the custom trigger in DialogTrigger without asChild — Base UI renders it correctly */}
       <DialogTrigger render={<button type="button" className="contents" />}>
         {trigger}
       </DialogTrigger>
@@ -146,7 +142,6 @@ function CollectionSection({
             const isActive = activePath === href;
             return (
               <SidebarMenuItem key={page.id}>
-                {/* Base UI render prop: pass the <a> as the rendered element */}
                 <SidebarMenuButton
                   render={<a href={href} />}
                   isActive={isActive}
@@ -225,7 +220,88 @@ function SpaceSection({
   );
 }
 
-export function AppSidebar({ tree, user }: Props) {
+function WorkspaceHeader({ tree, memberCount }: { tree: WorkspaceTree; memberCount: number | null }) {
+  return (
+    <div className="flex items-center gap-2 border-b border-sidebar-border px-3.5 py-3 group">
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[13.5px] font-medium text-foreground">{tree.name}</div>
+        <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+          {memberCount !== null ? `${memberCount} member${memberCount === 1 ? "" : "s"}` : "workspace"}
+        </div>
+      </div>
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <ExportDialog workspaceId={tree.id} workspaceName={tree.name} />
+        <a
+          href={`/orgs/${tree.org_id}/settings`}
+          className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+          title="Organization settings"
+        >
+          <Settings className="h-3.5 w-3.5" />
+        </a>
+      </div>
+      <button
+        type="button"
+        className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+        title="Workspace menu"
+        aria-label="Workspace menu"
+      >
+        <ChevronDown className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+function PagesPanel({
+  tree,
+  activePath,
+  refresh,
+}: {
+  tree: WorkspaceTree;
+  activePath: string;
+  refresh: () => void;
+}) {
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto py-1">
+      <div className="flex items-center justify-between px-3 py-1 group">
+        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+          Spaces
+        </span>
+        <CreateDialog
+          trigger={
+            <span className="opacity-0 group-hover:opacity-100 cursor-pointer text-muted-foreground hover:text-foreground" title="New space">
+              <Plus className="h-3.5 w-3.5" />
+            </span>
+          }
+          title="New Space"
+          placeholder="Space name"
+          onSubmit={async (name) => {
+            await createSpace(tree.id, slugify(name), name);
+            refresh();
+          }}
+        />
+      </div>
+      {tree.spaces.map((space) => (
+        <SpaceSection
+          key={space.id}
+          space={space}
+          workspaceId={tree.id}
+          activePath={activePath}
+          onCreated={refresh}
+        />
+      ))}
+      {tree.spaces.length === 0 && (
+        <div className="px-4 py-6 text-center">
+          <p className="text-xs text-muted-foreground">No spaces yet</p>
+          <p className="mt-1 text-xs text-muted-foreground/70">
+            Hover <strong>Spaces</strong> above and click <strong>+</strong> to create one.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function AppSidebar({ tree, panel, memberCount, searchInputRef }: Props) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -234,90 +310,13 @@ export function AppSidebar({ tree, user }: Props) {
   }
 
   return (
-    <Sidebar>
-      <SidebarHeader className="border-b border-sidebar-border">
-        <div className="flex items-center justify-between px-2 py-1.5">
-          <a href="/workspaces" className="text-sm font-semibold tracking-tight hover:opacity-70">
-            Marrow
-          </a>
-          <SidebarTrigger className="-mr-1" />
-        </div>
-        <div className="flex items-center justify-between px-2 pb-1.5 group">
-          <span className="text-xs font-medium text-muted-foreground">{tree.name}</span>
-          <div className="flex items-center gap-1">
-            <ExportDialog workspaceId={tree.id} workspaceName={tree.name} />
-            <a
-              href={`/orgs/${tree.org_id}/settings`}
-              className="hidden group-hover:flex items-center text-muted-foreground hover:text-foreground"
-              title="Organization settings"
-            >
-              <Settings className="h-3.5 w-3.5" />
-            </a>
-          <CreateDialog
-            trigger={
-              <span className="hidden group-hover:flex items-center text-muted-foreground hover:text-foreground cursor-pointer" title="New space">
-                <Plus className="h-3.5 w-3.5" />
-              </span>
-            }
-            title="New Space"
-            placeholder="Space name"
-            onSubmit={async (name) => {
-              await createSpace(tree.id, slugify(name), name);
-              refresh();
-            }}
-          />
-          </div>
-        </div>
-        <div className="px-2 pb-2">
-          <SearchDialog workspaceId={tree.id} />
-        </div>
-      </SidebarHeader>
+    <aside className="flex h-full w-[272px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+      <WorkspaceHeader tree={tree} memberCount={memberCount} />
 
-      <SidebarContent>
-        {tree.spaces.map((space) => (
-          <SpaceSection
-            key={space.id}
-            space={space}
-            workspaceId={tree.id}
-            activePath={pathname}
-            onCreated={refresh}
-          />
-        ))}
-        {tree.spaces.length === 0 && (
-          <div className="px-4 py-6 text-center">
-            <p className="text-xs text-muted-foreground">
-              No spaces yet
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground/70">
-              Hover the workspace name above and click <strong>+</strong> to create one.
-            </p>
-          </div>
-        )}
-      </SidebarContent>
-
-      {user && (
-        <SidebarFooter className="border-t border-sidebar-border">
-          <div className="flex items-center justify-between px-2 py-1.5">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{user.name}</p>
-              <p className="truncate text-xs text-muted-foreground">{user.email}</p>
-            </div>
-            <div className="flex items-center gap-1">
-              <ThemeToggle />
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={async () => {
-                  const logoutUrl = await logout();
-                  window.location.href = logoutUrl ?? "/login";
-                }}
-              >
-                Sign out
-              </Button>
-            </div>
-          </div>
-        </SidebarFooter>
-      )}
-    </Sidebar>
+      {panel === "pages" && <PagesPanel tree={tree} activePath={pathname} refresh={refresh} />}
+      {panel === "search" && <SearchPanel workspaceId={tree.id} inputRef={searchInputRef} />}
+      {panel === "starred" && <StarredPanel />}
+      {panel === "inbox" && <InboxPanel />}
+    </aside>
   );
 }
