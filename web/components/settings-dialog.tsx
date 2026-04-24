@@ -1,57 +1,59 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Settings } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 interface Props {
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  trigger?: ReactElement;
+  triggerClassName?: string;
+  iconClassName?: string;
 }
 
-export function SettingsDialog({ open: openProp, onOpenChange, trigger }: Props) {
-  const [internalOpen, setInternalOpen] = useState(false);
-  const open = openProp ?? internalOpen;
-  const setOpen = onOpenChange ?? setInternalOpen;
+export function SettingsDialog({ triggerClassName, iconClassName }: Props) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
-  const defaultTrigger = (
-    <button
-      type="button"
-      title="Settings"
-      aria-label="Settings"
-      className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-    >
-      <Settings className="h-3.5 w-3.5" />
-    </button>
-  );
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={trigger ?? defaultTrigger} />
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Settings</DialogTitle>
-          <DialogDescription>Personal preferences for this account.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <section className="flex items-center justify-between rounded-md border border-border px-3 py-2.5">
-            <div>
-              <div className="text-sm font-medium">Appearance</div>
-              <div className="text-xs text-muted-foreground">Toggle dark or light mode.</div>
-            </div>
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        title="Settings"
+        aria-label="Settings"
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          "flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground",
+          triggerClassName,
+        )}
+      >
+        <Settings className={cn("h-3.5 w-3.5", iconClassName)} />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute bottom-0 left-[calc(100%+8px)] z-50 w-60 rounded-md border border-border bg-popover py-1 shadow-lg"
+        >
+          <div className="px-3 py-2">
+            <p className="text-sm font-medium text-foreground">Settings</p>
+            <p className="text-xs text-muted-foreground">Personal preferences.</p>
+          </div>
+          <div className="my-1 border-t border-border" />
+          <div className="flex items-center justify-between px-3 py-1.5">
+            <span className="text-sm text-foreground">Appearance</span>
             <ThemeToggle />
-          </section>
+          </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      )}
+    </div>
   );
 }

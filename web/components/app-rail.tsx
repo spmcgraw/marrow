@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { FolderClosed, Search, Star, Inbox, Settings, LogOut } from "lucide-react";
+import { FolderClosed, Search, Star, Inbox, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { logout } from "@/lib/api";
@@ -13,6 +13,8 @@ interface Props {
   workspaceName: string;
   panel: RailPanel;
   onPanelChange: (panel: RailPanel) => void;
+  sidebarOpen: boolean;
+  onSidebarToggle: () => void;
   user?: User | null;
 }
 
@@ -30,7 +32,14 @@ function initials(name?: string | null) {
   return letters || name[0]?.toUpperCase() || "?";
 }
 
-export function AppRail({ workspaceName, panel, onPanelChange, user }: Props) {
+export function AppRail({
+  workspaceName,
+  panel,
+  onPanelChange,
+  sidebarOpen,
+  onSidebarToggle,
+  user,
+}: Props) {
   return (
     <div className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-sidebar-border bg-sidebar py-3.5">
       <button
@@ -42,12 +51,19 @@ export function AppRail({ workspaceName, panel, onPanelChange, user }: Props) {
       </button>
 
       {TABS.map(({ id, label, Icon }) => {
-        const active = panel === id;
+        const active = panel === id && sidebarOpen;
         return (
           <button
             key={id}
             type="button"
-            onClick={() => onPanelChange(id)}
+            onClick={() => {
+              if (panel === id) {
+                onSidebarToggle();
+              } else {
+                onPanelChange(id);
+                if (!sidebarOpen) onSidebarToggle();
+              }
+            }}
             title={label}
             aria-label={label}
             aria-pressed={active}
@@ -66,16 +82,8 @@ export function AppRail({ workspaceName, panel, onPanelChange, user }: Props) {
       <div className="flex-1" />
 
       <SettingsDialog
-        trigger={
-          <button
-            type="button"
-            title="Settings"
-            aria-label="Settings"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
-        }
+        triggerClassName="h-9 w-9 rounded-lg"
+        iconClassName="h-4 w-4"
       />
 
       {user && <UserMenu user={user} />}
