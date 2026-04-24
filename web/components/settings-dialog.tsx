@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactElement } from "react";
 import { Settings } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
@@ -13,26 +13,30 @@ import {
 } from "@/components/ui/dialog";
 
 interface Props {
-  trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  trigger?: ReactElement;
 }
 
-export function SettingsDialog({ trigger }: Props) {
-  const [open, setOpen] = useState(false);
+export function SettingsDialog({ open: openProp, onOpenChange, trigger }: Props) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = openProp ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
+
+  const defaultTrigger = (
+    <button
+      type="button"
+      title="Settings"
+      aria-label="Settings"
+      className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+    >
+      <Settings className="h-3.5 w-3.5" />
+    </button>
+  );
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <button
-            type="button"
-            title="Settings"
-            aria-label="Settings"
-            className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-          >
-            {trigger ?? <Settings className="h-3.5 w-3.5" />}
-          </button>
-        }
-      />
+      <DialogTrigger render={trigger ?? defaultTrigger} />
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>

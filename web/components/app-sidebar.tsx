@@ -4,7 +4,6 @@ import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, FilePlus, FolderPlus, Plus, Settings } from "lucide-react";
 import { ExportDialog } from "@/components/export-dialog";
-import { SettingsDialog } from "@/components/settings-dialog";
 import { toast } from "sonner";
 import {
   SidebarGroup,
@@ -24,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { createCollection, createPage, createSpace, logout, slugify } from "@/lib/api";
+import { createCollection, createPage, createSpace, slugify } from "@/lib/api";
 import { SearchPanel } from "@/components/rail-panels/search-panel";
 import { StarredPanel } from "@/components/rail-panels/starred-panel";
 import { InboxPanel } from "@/components/rail-panels/inbox-panel";
@@ -302,7 +301,7 @@ function PagesPanel({
   );
 }
 
-export function AppSidebar({ tree, user, panel, memberCount, searchInputRef }: Props) {
+export function AppSidebar({ tree, panel, memberCount, searchInputRef }: Props) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -318,28 +317,6 @@ export function AppSidebar({ tree, user, panel, memberCount, searchInputRef }: P
       {panel === "search" && <SearchPanel workspaceId={tree.id} inputRef={searchInputRef} />}
       {panel === "starred" && <StarredPanel />}
       {panel === "inbox" && <InboxPanel />}
-
-      {user && (
-        <div className="flex items-center justify-between gap-2 border-t border-sidebar-border px-3 py-2">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-foreground">{user.name}</p>
-            <p className="truncate text-xs text-muted-foreground">{user.email}</p>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <SettingsDialog />
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={async () => {
-                const logoutUrl = await logout();
-                window.location.href = logoutUrl ?? "/login";
-              }}
-            >
-              Sign out
-            </Button>
-          </div>
-        </div>
-      )}
     </aside>
   );
 }
