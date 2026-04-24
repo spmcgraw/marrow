@@ -4,7 +4,7 @@ import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, FilePlus, FolderPlus, Plus, Settings } from "lucide-react";
 import { ExportDialog } from "@/components/export-dialog";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { SettingsDialog } from "@/components/settings-dialog";
 import { toast } from "sonner";
 import {
   SidebarGroup,
@@ -326,7 +326,7 @@ export function AppSidebar({ tree, user, panel, memberCount, searchInputRef }: P
             <p className="truncate text-xs text-muted-foreground">{user.email}</p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <ThemeToggle />
+            <SettingsDialog />
             <Button
               variant="ghost"
               size="xs"

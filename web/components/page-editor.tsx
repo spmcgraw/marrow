@@ -26,12 +26,15 @@ import {
   createCodeBlockSpec,
   defaultBlockSpecs,
 } from "@blocknote/core";
+import { filterSuggestionItems } from "@blocknote/core/extensions";
 import {
   SuggestionMenuController,
   TableHandlesController,
+  getDefaultReactSlashMenuItems,
   useCreateBlockNote,
   type DefaultReactSuggestionItem,
 } from "@blocknote/react";
+import { calloutBlockSpec, calloutSlashMenuItem } from "@/components/editor/callout-block";
 import { BlockNoteView } from "@blocknote/mantine";
 import { createHighlighter } from "shiki";
 import { Upload } from "lucide-react";
@@ -92,6 +95,7 @@ const schema = BlockNoteSchema.create({
         }),
       defaultLanguage: "text",
     }),
+    callout: calloutBlockSpec(),
   },
 });
 
@@ -281,9 +285,16 @@ export function PageEditor({ initialPage }: Props) {
       </div>
 
       {/* Title */}
-      <div className="px-8 pt-8 pb-2">
+      <div className="px-10 pt-14 pb-2">
         <input
-          className="w-full bg-transparent text-3xl font-bold outline-none placeholder:text-muted-foreground"
+          className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
+          style={{
+            fontFamily: "var(--font-heading)",
+            fontSize: 40,
+            fontWeight: 400,
+            letterSpacing: "-0.015em",
+            fontVariationSettings: '"SOFT" 60',
+          }}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={saveNow}
@@ -301,6 +312,17 @@ export function PageEditor({ initialPage }: Props) {
         >
           {/* Table drag handles */}
           <TableHandlesController />
+
+          {/* Slash menu — default items + callout */}
+          <SuggestionMenuController
+            triggerCharacter="/"
+            getItems={async (query) =>
+              filterSuggestionItems(
+                [...getDefaultReactSlashMenuItems(editor), calloutSlashMenuItem(editor)],
+                query,
+              )
+            }
+          />
 
           {/* @-mention suggestion menu for page links */}
           <SuggestionMenuController
