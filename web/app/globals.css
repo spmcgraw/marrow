@@ -48,6 +48,13 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Font stacks as real CSS variables (the @theme inline block above registers
+ * them as Tailwind tokens but does not emit them on :root, so inline styles
+ * like `font-family: var(--font-heading)` would otherwise resolve to nothing). */
+:root {
+  --font-heading: var(--font-fraunces), ui-serif, Georgia, serif;
+}
+
 /* Light mode — design tokens from docs/design-tokens.md */
 :root {
   --background: #dde3ee;
