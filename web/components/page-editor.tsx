@@ -127,32 +127,37 @@ export function PageEditor({ initialPage }: Props) {
 
   const editor = useCreateBlockNote({ schema });
 
-  // Load initial content — JSON (new format) or Markdown (legacy)
+  // Load initial content — JSON (new format) or Markdown (legacy).
+  // Deferred to a microtask so BlockNote's internal flushSync doesn't fire
+  // while React is still committing the initial render (React 19).
   useEffect(() => {
     const content = initialPage.content;
     if (!content) return;
 
-    isInitializingRef.current = true;
-
-    const fmt = initialPage.content_format ?? "markdown";
-    if (fmt === "json") {
+    let cancelled = false;
+    queueMicrotask(async () => {
+      if (cancelled) return;
+      isInitializingRef.current = true;
+      const fmt = initialPage.content_format ?? "markdown";
       try {
-        const blocks = JSON.parse(content);
-        editor.replaceBlocks(editor.document, blocks);
+        if (fmt === "json") {
+          const blocks = JSON.parse(content);
+          editor.replaceBlocks(editor.document, blocks);
+        } else {
+          const blocks = await editor.tryParseMarkdownToBlocks(content);
+          editor.replaceBlocks(editor.document, blocks);
+        }
         pendingContentRef.current = content;
       } catch {
-        // Malformed JSON: fall back to showing raw text
         pendingContentRef.current = content;
+      } finally {
+        isInitializingRef.current = false;
       }
-    } else {
-      // Legacy Markdown: parse into blocks
-      const blocks = editor.tryParseMarkdownToBlocks(content);
-      editor.replaceBlocks(editor.document, blocks);
-      // On first save this will be re-serialized as JSON
-      pendingContentRef.current = content;
-    }
+    });
 
-    isInitializingRef.current = false;
+    return () => {
+      cancelled = true;
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveNow = useCallback(async () => {
