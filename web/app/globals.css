@@ -149,6 +149,18 @@
  * BlockNote editor restyle (Phase A design tokens)
  * ------------------------------------------------------------------------- */
 
+/* Seat the editor on the page background so the typing area doesn't read as
+ * a banded surface distinct from the surrounding page. */
+.bn-container {
+  --bn-colors-editor-background: transparent;
+  --bn-colors-editor-text: var(--foreground);
+}
+.bn-container .bn-editor,
+.bn-container .ProseMirror {
+  background-color: transparent;
+  color: var(--foreground);
+}
+
 /* WikiLinks — page mentions and internal links render as dashed, accent-colored
  * underlines so they're visually distinct from plain external links. */
 .bn-container a[href*="/pages/"],
