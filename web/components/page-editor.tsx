@@ -287,9 +287,8 @@ export function PageEditor({ initialPage }: Props) {
       {/* Title */}
       <div className="px-10 pt-14 pb-2">
         <input
-          className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
+          className="w-full bg-transparent font-heading outline-none placeholder:text-muted-foreground"
           style={{
-            fontFamily: "var(--font-heading)",
             fontSize: 40,
             fontWeight: 400,
             letterSpacing: "-0.015em",
