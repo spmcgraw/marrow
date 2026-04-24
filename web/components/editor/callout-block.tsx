@@ -46,7 +46,7 @@ export function calloutSlashMenuItem(editor: any): DefaultReactSuggestionItem {
     title: "Callout",
     subtext: "Highlight a note, warning, or pull-quote",
     aliases: ["note", "warning", "tip", "admonition"],
-    group: "Basic blocks",
+    group: "Custom",
     onItemClick: () => {
       insertOrUpdateBlockForSlashMenu(editor, { type: "callout" });
     },
