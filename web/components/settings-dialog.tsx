@@ -19,13 +19,6 @@ interface Props {
 export function SettingsDialog({ trigger }: Props) {
   const [open, setOpen] = useState(false);
 
-  const triggerContent = trigger ?? (
-    <>
-      <Settings className="h-3.5 w-3.5" />
-      <span className="sr-only">Settings</span>
-    </>
-  );
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
@@ -33,12 +26,13 @@ export function SettingsDialog({ trigger }: Props) {
           <button
             type="button"
             title="Settings"
+            aria-label="Settings"
             className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-          />
+          >
+            {trigger ?? <Settings className="h-3.5 w-3.5" />}
+          </button>
         }
-      >
-        {triggerContent}
-      </DialogTrigger>
+      />
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
