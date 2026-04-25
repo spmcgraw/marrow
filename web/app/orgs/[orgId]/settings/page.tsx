@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -26,7 +26,7 @@ export default function OrgSettingsPage() {
   const [inviteRole, setInviteRole] = useState<string>("editor");
   const [busy, setBusy] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const [o, m] = await Promise.all([getOrg(orgId), listOrgMembers(orgId)]);
       setOrg(o);
@@ -34,11 +34,24 @@ export default function OrgSettingsPage() {
     } catch (err) {
       toast.error(String(err));
     }
-  }
+  }, [orgId]);
 
   useEffect(() => {
-    load();
-  }, [orgId]); // eslint-disable-line react-hooks/exhaustive-deps
+    let cancelled = false;
+    (async () => {
+      try {
+        const [o, m] = await Promise.all([getOrg(orgId), listOrgMembers(orgId)]);
+        if (cancelled) return;
+        setOrg(o);
+        setMembers(m);
+      } catch (err) {
+        if (!cancelled) toast.error(String(err));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId]);
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
