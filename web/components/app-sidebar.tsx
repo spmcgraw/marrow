@@ -78,8 +78,8 @@ function CollectionSection({
               onCommit={async (name) => {
                 const page = await createPage(col.id, slugify(name), name);
                 setCreating(false);
-                onCreated();
                 router.push(`/w/${workspaceId}/pages/${page.id}?new=1`);
+                onCreated();
               }}
               onCancel={() => setCreating(false)}
             />
