@@ -19,7 +19,7 @@ import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
   BlockNoteSchema,
@@ -111,6 +111,20 @@ export function PageEditor({ initialPage }: Props) {
   // Extract workspaceId from the URL for page mention search
   const params = useParams<{ workspaceId?: string }>();
   const workspaceId = params?.workspaceId;
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (searchParams?.get("new") !== "1") return;
+    titleInputRef.current?.focus();
+    titleInputRef.current?.select();
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("new");
+    const qs = next.toString();
+    router.replace(qs ? `?${qs}` : "?", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Refs for save logic — avoids stale closures in debounce callbacks
   const titleRef = useRef(title);
@@ -292,6 +306,7 @@ export function PageEditor({ initialPage }: Props) {
       {/* Title */}
       <div className="px-10 pt-14 pb-2">
         <input
+          ref={titleInputRef}
           className="w-full bg-transparent font-heading outline-none placeholder:text-muted-foreground"
           style={{
             fontSize: 40,

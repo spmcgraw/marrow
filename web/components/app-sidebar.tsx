@@ -4,7 +4,6 @@ import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, FilePlus, FolderPlus, Plus, Settings } from "lucide-react";
 import { ExportDialog } from "@/components/export-dialog";
-import { toast } from "sonner";
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -13,16 +12,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { InlineCreateRow } from "@/components/sidebar/inline-create-row";
 import { createCollection, createPage, createSpace, slugify } from "@/lib/api";
 import { SearchPanel } from "@/components/rail-panels/search-panel";
 import { StarredPanel } from "@/components/rail-panels/starred-panel";
@@ -38,64 +28,6 @@ interface Props {
   searchInputRef: React.RefObject<HTMLInputElement | null>;
 }
 
-function CreateDialog({
-  trigger,
-  title,
-  placeholder,
-  onSubmit,
-}: {
-  trigger: React.ReactNode;
-  title: string;
-  placeholder: string;
-  onSubmit: (name: string) => Promise<void>;
-}) {
-  const [open, setOpen] = useState(false);
-  const [value, setValue] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!value.trim()) return;
-    setBusy(true);
-    try {
-      await onSubmit(value.trim());
-      setValue("");
-      setOpen(false);
-    } catch (err) {
-      toast.error(String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<button type="button" className="contents" />}>
-        {trigger}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <Input
-            placeholder={placeholder}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            autoFocus
-            disabled={busy}
-          />
-          <DialogFooter>
-            <Button type="submit" disabled={busy || !value.trim()}>
-              Create
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function CollectionSection({
   col,
   workspaceId,
@@ -108,7 +40,13 @@ function CollectionSection({
   onCreated: () => void;
 }) {
   const [open, setOpen] = useState(true);
+  const [creating, setCreating] = useState(false);
   const router = useRouter();
+
+  function startCreate() {
+    setOpen(true);
+    setCreating(true);
+  }
 
   return (
     <div className="ml-3">
@@ -120,23 +58,32 @@ function CollectionSection({
           {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
           {col.name}
         </button>
-        <CreateDialog
-          trigger={
-            <span className="hidden group-hover:flex items-center text-muted-foreground hover:text-foreground cursor-pointer" title="New page">
-              <FilePlus className="h-3 w-3" />
-            </span>
-          }
-          title="New Page"
-          placeholder="Page title"
-          onSubmit={async (name) => {
-            const page = await createPage(col.id, slugify(name), name);
-            onCreated();
-            router.push(`/w/${workspaceId}/pages/${page.id}`);
-          }}
-        />
+        <button
+          type="button"
+          onClick={startCreate}
+          className="hidden group-hover:flex items-center text-muted-foreground hover:text-foreground"
+          title="New page"
+          aria-label="New page"
+        >
+          <FilePlus className="h-3 w-3" />
+        </button>
       </div>
       {open && (
         <SidebarMenu>
+          {creating && (
+            <InlineCreateRow
+              placeholder="Page title"
+              className="flex items-center gap-2 px-2 py-1"
+              icon={<FilePlus className="h-3 w-3 text-muted-foreground" />}
+              onCommit={async (name) => {
+                const page = await createPage(col.id, slugify(name), name);
+                setCreating(false);
+                onCreated();
+                router.push(`/w/${workspaceId}/pages/${page.id}?new=1`);
+              }}
+              onCancel={() => setCreating(false)}
+            />
+          )}
           {col.pages.map((page) => {
             const href = `/w/${workspaceId}/pages/${page.id}`;
             const isActive = activePath === href;
@@ -152,7 +99,7 @@ function CollectionSection({
               </SidebarMenuItem>
             );
           })}
-          {col.pages.length === 0 && (
+          {!creating && col.pages.length === 0 && (
             <p className="px-2 py-1 text-xs text-muted-foreground">No pages yet</p>
           )}
         </SidebarMenu>
@@ -173,6 +120,12 @@ function SpaceSection({
   onCreated: () => void;
 }) {
   const [open, setOpen] = useState(true);
+  const [creating, setCreating] = useState(false);
+
+  function startCreate() {
+    setOpen(true);
+    setCreating(true);
+  }
 
   return (
     <SidebarGroup>
@@ -186,22 +139,31 @@ function SpaceSection({
           </span>
           {space.name}
         </SidebarGroupLabel>
-        <CreateDialog
-          trigger={
-            <span className="mr-2 hidden group-hover:flex items-center text-muted-foreground hover:text-foreground cursor-pointer" title="New collection">
-              <FolderPlus className="h-3.5 w-3.5" />
-            </span>
-          }
-          title="New Collection"
-          placeholder="Collection name"
-          onSubmit={async (name) => {
-            await createCollection(space.id, slugify(name), name);
-            onCreated();
-          }}
-        />
+        <button
+          type="button"
+          onClick={startCreate}
+          className="mr-2 hidden group-hover:flex items-center text-muted-foreground hover:text-foreground"
+          title="New collection"
+          aria-label="New collection"
+        >
+          <FolderPlus className="h-3.5 w-3.5" />
+        </button>
       </div>
       {open && (
         <SidebarGroupContent>
+          {creating && (
+            <InlineCreateRow
+              placeholder="Collection name"
+              className="ml-3 flex items-center gap-2 py-0.5"
+              icon={<FolderPlus className="h-3 w-3 text-muted-foreground" />}
+              onCommit={async (name) => {
+                await createCollection(space.id, slugify(name), name);
+                setCreating(false);
+                onCreated();
+              }}
+              onCancel={() => setCreating(false)}
+            />
+          )}
           {space.collections.map((col) => (
             <CollectionSection
               key={col.id}
@@ -211,7 +173,7 @@ function SpaceSection({
               onCreated={onCreated}
             />
           ))}
-          {space.collections.length === 0 && (
+          {!creating && space.collections.length === 0 && (
             <p className="px-4 py-1 text-xs text-muted-foreground">No collections yet</p>
           )}
         </SidebarGroupContent>
@@ -260,26 +222,41 @@ function PagesPanel({
   activePath: string;
   refresh: () => void;
 }) {
+  const [creatingSpace, setCreatingSpace] = useState(false);
+
   return (
     <div className="min-h-0 flex-1 overflow-y-auto py-1">
       <div className="flex items-center justify-between px-3 py-1 group">
         <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
           Spaces
         </span>
-        <CreateDialog
-          trigger={
-            <span className="opacity-0 group-hover:opacity-100 cursor-pointer text-muted-foreground hover:text-foreground" title="New space">
-              <Plus className="h-3.5 w-3.5" />
+        <button
+          type="button"
+          onClick={() => setCreatingSpace(true)}
+          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+          title="New space"
+          aria-label="New space"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      {creatingSpace && (
+        <InlineCreateRow
+          placeholder="Space name"
+          className="flex items-center gap-2 px-3 py-1"
+          icon={
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-primary/10 text-[10px] font-semibold text-primary">
+              ·
             </span>
           }
-          title="New Space"
-          placeholder="Space name"
-          onSubmit={async (name) => {
+          onCommit={async (name) => {
             await createSpace(tree.id, slugify(name), name);
+            setCreatingSpace(false);
             refresh();
           }}
+          onCancel={() => setCreatingSpace(false)}
         />
-      </div>
+      )}
       {tree.spaces.map((space) => (
         <SpaceSection
           key={space.id}
@@ -289,7 +266,7 @@ function PagesPanel({
           onCreated={refresh}
         />
       ))}
-      {tree.spaces.length === 0 && (
+      {!creatingSpace && tree.spaces.length === 0 && (
         <div className="px-4 py-6 text-center">
           <p className="text-xs text-muted-foreground">No spaces yet</p>
           <p className="mt-1 text-xs text-muted-foreground/70">
