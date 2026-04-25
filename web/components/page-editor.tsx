@@ -25,6 +25,7 @@ import {
   BlockNoteSchema,
   createCodeBlockSpec,
   defaultBlockSpecs,
+  defaultInlineContentSpecs,
 } from "@blocknote/core";
 import { filterSuggestionItems } from "@blocknote/core/extensions";
 import {
@@ -35,6 +36,16 @@ import {
   type DefaultReactSuggestionItem,
 } from "@blocknote/react";
 import { calloutBlockSpec, calloutSlashMenuItem } from "@/components/editor/callout-block";
+import { mentionInlineContentSpec } from "@/components/editor/mention-inline-content";
+import { pageLinkSlashMenuItem } from "@/components/editor/page-link-slash-item";
+import { useWorkspaceTree } from "@/components/workspace-tree-context";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { BlockNoteView } from "@blocknote/mantine";
 import { createHighlighter } from "shiki";
 import { Upload } from "lucide-react";
@@ -55,11 +66,12 @@ import { CommentBubbleFab } from "@/components/comment-bubble-fab";
 import {
   attachmentFileUrl,
   listAttachments,
+  listOrgMembers,
   searchWorkspace,
   updatePage,
   uploadAttachment,
 } from "@/lib/api";
-import type { Attachment, Page } from "@/lib/types";
+import type { Attachment, OrgMembership, Page, SearchResultItem } from "@/lib/types";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -96,6 +108,10 @@ const schema = BlockNoteSchema.create({
       defaultLanguage: "text",
     }),
     callout: calloutBlockSpec(),
+  },
+  inlineContentSpecs: {
+    ...defaultInlineContentSpecs,
+    mention: mentionInlineContentSpec,
   },
 });
 
@@ -249,27 +265,107 @@ export function PageEditor({ initialPage }: Props) {
   );
 
   // ---------------------------------------------------------------------------
-  // @-mention suggestion menu — queries workspace pages
+  // @-mention suggestion menu — queries workspace members
   // ---------------------------------------------------------------------------
 
-  const getPageMentionItems = useCallback(
+  const tree = useWorkspaceTree();
+  const orgId = tree?.org_id ?? null;
+  const membersCacheRef = useRef<{ orgId: string; members: OrgMembership[] } | null>(null);
+
+  const getMemberItems = useCallback(
     async (query: string): Promise<DefaultReactSuggestionItem[]> => {
-      if (!workspaceId) return [];
-      try {
-        const { results } = await searchWorkspace(workspaceId, query);
-        return results.slice(0, 8).map((result) => ({
-          title: result.title,
-          subtext: `${result.space_name} / ${result.collection_name}`,
-          onItemClick: () => {
-            editor.createLink(`/w/${workspaceId}/pages/${result.page_id}`, result.title);
-          },
-        }));
-      } catch {
-        return [];
+      if (!orgId) return [];
+      let members: OrgMembership[];
+      if (membersCacheRef.current?.orgId === orgId) {
+        members = membersCacheRef.current.members;
+      } else {
+        try {
+          members = await listOrgMembers(orgId);
+          membersCacheRef.current = { orgId, members };
+        } catch {
+          return [];
+        }
       }
+
+      const q = query.trim().toLowerCase();
+      const filtered = q
+        ? members.filter(
+            (m) => m.email.toLowerCase().includes(q),
+          )
+        : members;
+
+      return filtered.slice(0, 8).map((member) => {
+        const displayName = member.email.split("@")[0] || member.email;
+        return {
+          title: displayName,
+          subtext: member.email,
+          onItemClick: () => {
+            editor.insertInlineContent([
+              {
+                type: "mention",
+                props: { userId: member.user_id ?? "", displayName },
+              },
+              " ",
+            ]);
+          },
+        };
+      });
+    },
+    [editor, orgId],
+  );
+
+  // ---------------------------------------------------------------------------
+  // /page slash item — opens a page picker that inserts a WikiLink
+  // ---------------------------------------------------------------------------
+
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState("");
+  const [pickerResults, setPickerResults] = useState<SearchResultItem[]>([]);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerActiveIndex, setPickerActiveIndex] = useState(0);
+
+  useEffect(() => {
+    if (!pickerOpen || !workspaceId) return;
+    const q = pickerQuery.trim();
+    if (!q) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setPickerLoading(true);
+      try {
+        const res = await searchWorkspace(workspaceId, q);
+        if (!cancelled) {
+          setPickerResults(res.results.slice(0, 12));
+          setPickerActiveIndex(0);
+        }
+      } catch {
+        if (!cancelled) setPickerResults([]);
+      } finally {
+        if (!cancelled) setPickerLoading(false);
+      }
+    }, 200);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [pickerOpen, pickerQuery, workspaceId]);
+
+  const insertPageLink = useCallback(
+    (result: SearchResultItem) => {
+      if (!workspaceId) return;
+      editor.createLink(`/w/${workspaceId}/pages/${result.page_id}`, result.title);
+      setPickerOpen(false);
+      setPickerQuery("");
+      setPickerResults([]);
     },
     [editor, workspaceId],
   );
+
+  const openPagePicker = useCallback(() => {
+    setPickerQuery("");
+    setPickerResults([]);
+    setPickerActiveIndex(0);
+    setPickerOpen(true);
+  }, []);
 
   const statusLabel = {
     idle: "",
@@ -334,24 +430,94 @@ export function PageEditor({ initialPage }: Props) {
           {/* Table drag handles */}
           <TableHandlesController />
 
-          {/* Slash menu — default items + callout */}
+          {/* Slash menu — default items + callout + page link */}
           <SuggestionMenuController
             triggerCharacter="/"
             getItems={async (query) =>
               filterSuggestionItems(
-                [...getDefaultReactSlashMenuItems(editor), calloutSlashMenuItem(editor)],
+                [
+                  ...getDefaultReactSlashMenuItems(editor),
+                  calloutSlashMenuItem(editor),
+                  pageLinkSlashMenuItem(editor, openPagePicker),
+                ],
                 query,
               )
             }
           />
 
-          {/* @-mention suggestion menu for page links */}
+          {/* @-mention suggestion menu for workspace members */}
           <SuggestionMenuController
             triggerCharacter="@"
-            getItems={getPageMentionItems}
+            getItems={getMemberItems}
           />
         </BlockNoteView>
       </div>
+
+      {/* Page picker (opened via /page slash item) */}
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Link to a page</DialogTitle>
+          </DialogHeader>
+          <Input
+            autoFocus
+            value={pickerQuery}
+            placeholder="Search pages…"
+            onChange={(e) => {
+              const v = e.target.value;
+              setPickerQuery(v);
+              if (!v.trim()) {
+                setPickerResults([]);
+                setPickerActiveIndex(0);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setPickerActiveIndex((i) => Math.min(i + 1, pickerResults.length - 1));
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setPickerActiveIndex((i) => Math.max(i - 1, 0));
+              } else if (e.key === "Enter" && pickerResults[pickerActiveIndex]) {
+                e.preventDefault();
+                insertPageLink(pickerResults[pickerActiveIndex]);
+              }
+            }}
+          />
+          <div className="max-h-72 overflow-y-auto">
+            {pickerLoading && (
+              <p className="px-1 py-2 text-xs text-muted-foreground">Searching…</p>
+            )}
+            {!pickerLoading && pickerQuery.trim() && pickerResults.length === 0 && (
+              <p className="px-1 py-2 text-xs text-muted-foreground">No pages match.</p>
+            )}
+            {!pickerQuery.trim() && (
+              <p className="px-1 py-2 text-xs text-muted-foreground">
+                Start typing to search pages in this workspace.
+              </p>
+            )}
+            <ul className="flex flex-col gap-1">
+              {pickerResults.map((r, i) => (
+                <li key={r.page_id}>
+                  <button
+                    type="button"
+                    onClick={() => insertPageLink(r)}
+                    onMouseEnter={() => setPickerActiveIndex(i)}
+                    className={`w-full rounded-md px-3 py-2 text-left transition-colors ${
+                      i === pickerActiveIndex ? "bg-accent" : "hover:bg-accent/60"
+                    }`}
+                  >
+                    <div className="text-sm font-medium text-foreground">{r.title}</div>
+                    <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                      {r.space_name} / {r.collection_name}
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {!commentsOpen && (
         <CommentBubbleFab onClick={() => { setSideDrawer(null); setCommentsOpen(true); }} />

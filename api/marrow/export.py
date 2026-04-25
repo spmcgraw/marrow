@@ -77,8 +77,11 @@ def _inline_to_text(inline_content: list) -> str:
             link_text = _inline_to_text(link_content)
             text += f"[{link_text}]({href})"
         elif item_type == "mention":
-            # Page mention: rendered as the mention text
-            text += item.get("props", {}).get("user", "")
+            # Member mention: lossy fallback to "@DisplayName" plaintext.
+            # The canonical userId is preserved in the JSON revision.
+            display_name = item.get("props", {}).get("displayName", "")
+            if display_name:
+                text += f"@{display_name}"
     return text
 
 
