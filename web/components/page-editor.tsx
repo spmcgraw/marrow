@@ -111,6 +111,22 @@ export function PageEditor({ initialPage }: Props) {
   // Extract workspaceId from the URL for page mention search
   const params = useParams<{ workspaceId?: string }>();
   const workspaceId = params?.workspaceId;
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("new") !== "1") return;
+    titleInputRef.current?.focus();
+    titleInputRef.current?.select();
+    params.delete("new");
+    const qs = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      window.location.pathname + (qs ? `?${qs}` : "")
+    );
+  }, [initialPage.id]);
 
   // Refs for save logic — avoids stale closures in debounce callbacks
   const titleRef = useRef(title);
@@ -292,6 +308,7 @@ export function PageEditor({ initialPage }: Props) {
       {/* Title */}
       <div className="px-10 pt-14 pb-2">
         <input
+          ref={titleInputRef}
           className="w-full bg-transparent font-heading outline-none placeholder:text-muted-foreground"
           style={{
             fontSize: 40,
