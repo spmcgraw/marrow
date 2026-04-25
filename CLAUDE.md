@@ -313,7 +313,7 @@ Marrow supports three authentication methods, checked in priority order:
 - **API client** (`lib/api.ts`): all server calls go through `apiFetch<T>()` which injects auth headers and handles errors
 - **Auto-save**: `PageEditor` debounces saves 2 seconds after last keystroke; shows Saving… / Saved / Error status
 - **Content format**: new saves store BlockNote JSON (`content_format='json'`); legacy Markdown revisions are loaded via `tryParseMarkdownToBlocks` for backward compat
-- **Editor features**: code blocks (Shiki syntax highlighting), tables (`TableHandlesController`), `@` page mentions (`SuggestionMenuController` → `searchWorkspace`)
+- **Editor features**: code blocks (Shiki syntax highlighting), tables (`TableHandlesController`), `@` member mentions (custom inline-content spec carrying `userId` + `displayName`, fed by `listOrgMembers`), `/page` slash item that opens a page picker and inserts a WikiLink (`searchWorkspace`)
 - **Sidebar create flows**: hover-to-reveal `+` buttons open `CreateDialog` with slug auto-generation via `slugify()`
 - **UI library**: Base UI (`@base-ui/react`) with Tailwind CSS 4 — uses `render` prop pattern, not `asChild`
 - **Theme**: `next-themes` wraps the root layout

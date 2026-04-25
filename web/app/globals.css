@@ -175,6 +175,23 @@
   text-decoration-thickness: 1px;
 }
 
+/* Member mentions — non-link styled token. */
+.bn-container .marrow-mention {
+  display: inline-flex;
+  align-items: baseline;
+  padding: 0 0.3em;
+  margin: 0 0.05em;
+  border-radius: 0.25rem;
+  background-color: color-mix(in oklab, var(--primary) 12%, transparent);
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  user-select: all;
+  cursor: default;
+}
+
 /* Task list checkboxes — squarer, more prominent, brand-colored. */
 .bn-container [data-content-type="checkListItem"] input[type="checkbox"] {
   appearance: none;
