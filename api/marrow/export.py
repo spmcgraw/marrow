@@ -111,9 +111,7 @@ def _blocks_to_markdown(blocks: list, indent: int = 0) -> list[str]:
                     ]
                     md_rows.append(f"{prefix}| {' | '.join(cell_texts)} |")
                     if i == 0:
-                        separator = f"{prefix}|" + "|".join(
-                            [" --- " for _ in cells]
-                        ) + "|"
+                        separator = f"{prefix}|" + "|".join([" --- " for _ in cells]) + "|"
                         md_rows.append(separator)
                 lines.extend(md_rows)
             continue
@@ -326,9 +324,7 @@ def estimate_export_sizes(
         if page.current_revision
     )
     revision_bytes = sum(
-        len((rev.content or "").encode())
-        for page in pages
-        for rev in page.revisions
+        len((rev.content or "").encode()) for page in pages for rev in page.revisions
     )
 
     slim_bytes = current_content_bytes + attachment_bytes
