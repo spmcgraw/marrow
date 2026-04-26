@@ -1,0 +1,31 @@
+# Cloudflare Containers config for the Marrow API.
+#
+# Deploy:
+#   docker build -t ghcr.io/spmcgraw/marrow-api:latest .
+#   docker push ghcr.io/spmcgraw/marrow-api:latest
+#   wrangler deploy
+#
+# Secrets are configured via `wrangler secret put`:
+#   wrangler secret put SECRET_KEY
+#   wrangler secret put DATABASE_URL
+#   wrangler secret put OIDC_CLIENT_SECRET   # if using OIDC
+
+name = "marrow-api"
+compatibility_date = "2025-10-01"
+main = "container-entrypoint.js"
+
+[[containers]]
+name = "marrow-api"
+image = "ghcr.io/spmcgraw/marrow-api:latest"
+instance_type = "standard"
+max_instances = 5
+
+[containers.configuration]
+port = 8000
+
+[vars]
+STORAGE_PATH = "/data/storage"
+CORS_ORIGINS = "https://app.marrow.so"
+FRONTEND_URL = "https://app.marrow.so"
+COOKIE_DOMAIN = ".marrow.so"
+# OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_REDIRECT_URI: set per environment.

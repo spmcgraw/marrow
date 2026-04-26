@@ -55,7 +55,7 @@
   --font-heading: var(--font-fraunces), ui-serif, Georgia, serif;
 }
 
-/* Light mode — design tokens from docs/design-tokens.md */
+/* Light mode — design tokens from references/design-tokens.md */
 :root {
   --background: #dde3ee;
   --foreground: #1e293b;

@@ -1,0 +1,16 @@
+# Cloudflare Pages config for the Marrow web frontend.
+#
+# Build:
+#   npm run pages:build
+# Deploy:
+#   npm run pages:deploy
+
+name = "marrow-web"
+compatibility_date = "2025-10-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".vercel/output/static"
+
+[vars]
+# Public env baked at build time. Override per-environment in the Pages dashboard.
+NEXT_PUBLIC_API_URL = "https://api.marrow.so"
+NEXT_PUBLIC_OIDC_ENABLED = "true"
