@@ -1,10 +1,10 @@
-import os
 from logging.config import fileConfig
 
 from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
+from marrow.db import _database_url
 
 load_dotenv()
 
@@ -12,8 +12,8 @@ load_dotenv()
 # access to the values within the .ini file in use.
 config = context.config
 
-# Override sqlalchemy.url with DATABASE_URL from the environment.
-config.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
+# Override sqlalchemy.url from env (DATABASE_URL or POSTGRES_* vars).
+config.set_main_option("sqlalchemy.url", _database_url())
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

@@ -24,6 +24,19 @@ Edit `.env`. The required values:
 
 See [Environment variables](/configuration/env-vars/) for the full reference, including OIDC and CORS.
 
+:::caution[Postgres password gotcha]
+`POSTGRES_PASSWORD` is only applied the first time the database volume is initialized. If you change it later, the existing user keeps the **old** password and the API will fail with `password authentication failed for user "marrow"`.
+
+To start over:
+
+```bash
+docker compose -f docker-compose.prod.yml down -v
+docker compose -f docker-compose.prod.yml up -d
+```
+
+`-v` removes the volume — only safe before you have real data.
+:::
+
 ## 2. Build and start
 
 ```bash

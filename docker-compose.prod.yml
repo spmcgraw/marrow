@@ -32,7 +32,13 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-marrow}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-marrow}
+      # API builds the DSN itself so passwords with special chars (@, :, /, etc.)
+      # are URL-encoded safely. See marrow/db.py.
+      POSTGRES_USER: ${POSTGRES_USER:-marrow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-marrow}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
       STORAGE_PATH: /data/storage
       API_KEY: ${API_KEY:-}
