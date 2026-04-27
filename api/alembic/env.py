@@ -13,7 +13,9 @@ load_dotenv()
 config = context.config
 
 # Override sqlalchemy.url from env (DATABASE_URL or POSTGRES_* vars).
-config.set_main_option("sqlalchemy.url", _database_url())
+# Escape % so ConfigParser interpolation doesn't choke on percent-encoded
+# password chars (e.g. ! → %21).
+config.set_main_option("sqlalchemy.url", _database_url().replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

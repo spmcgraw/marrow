@@ -19,7 +19,12 @@ import type {
   WorkspaceTree,
 } from "./types";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// Browser uses NEXT_PUBLIC_API_URL (the user-facing origin).
+// SSR inside Docker can't reach that origin from within the container, so
+// it uses INTERNAL_API_URL (the docker-network service name) when set.
+const BROWSER_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const SERVER_BASE_URL = process.env.INTERNAL_API_URL ?? BROWSER_BASE_URL;
+const BASE_URL = typeof window === "undefined" ? SERVER_BASE_URL : BROWSER_BASE_URL;
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY ?? "";
 
 async function apiFetch<T>(

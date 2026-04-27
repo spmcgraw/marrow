@@ -68,6 +68,10 @@ services:
     restart: unless-stopped
     depends_on:
       - api
+    environment:
+      # SSR inside the docker network can't reach NEXT_PUBLIC_API_URL
+      # (which is the public/browser origin). Reach the api by service name.
+      INTERNAL_API_URL: http://api:8000
     ports:
       - "${WEB_PORT:-3000}:3000"
 
