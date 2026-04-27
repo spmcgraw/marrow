@@ -351,6 +351,7 @@ def test_slim_bundle_is_restorable(session, tmp_path):
     """A slim bundle restores cleanly — one revision per page from pages/ content."""
     import uuid as _uuid
     from datetime import datetime, timezone
+
     from marrow.restore import restore_workspace
 
     now = datetime.now(timezone.utc).isoformat()
@@ -377,19 +378,48 @@ def test_slim_bundle_is_restorable(session, tmp_path):
             "name": "Slim Restore WS",
             "created_at": now,
         },
-        "spaces": [{"id": str(space_id), "workspace_id": str(ws_id), "slug": "sp", "name": "Space", "created_at": now}],
-        "collections": [{"id": str(col_id), "space_id": str(space_id), "slug": "col", "name": "Col", "created_at": now}],
-        "pages": [{"id": str(page_id), "collection_id": str(col_id), "slug": "pg", "title": "Page", "current_revision_id": None, "created_at": now}],
+        "spaces": [
+            {
+                "id": str(space_id),
+                "workspace_id": str(ws_id),
+                "slug": "sp",
+                "name": "Space",
+                "created_at": now,
+            }
+        ],
+        "collections": [
+            {
+                "id": str(col_id),
+                "space_id": str(space_id),
+                "slug": "col",
+                "name": "Col",
+                "created_at": now,
+            }
+        ],
+        "pages": [
+            {
+                "id": str(page_id),
+                "collection_id": str(col_id),
+                "slug": "pg",
+                "title": "Page",
+                "current_revision_id": None,
+                "created_at": now,
+            }
+        ],
         "revisions": [],
         "attachments": [],
     }
 
     import io as _io
+
     buf = _io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("manifest.json", json.dumps(manifest))
         zf.writestr(f"pages/{page_id}.md", "# Page\nCurrent content.")
-        zf.writestr("links.json", json.dumps({"internal_links": [], "broken_links": [], "orphaned_pages": []}))
+        zf.writestr(
+            "links.json",
+            json.dumps({"internal_links": [], "broken_links": [], "orphaned_pages": []}),
+        )
 
     bundle_path = tmp_path / "slim-bundle.zip"
     bundle_path.write_bytes(buf.getvalue())
@@ -399,6 +429,7 @@ def test_slim_bundle_is_restorable(session, tmp_path):
     assert slug == "slim-restore-ws"
 
     from marrow.models import Workspace
+
     restored_ws = session.query(Workspace).filter_by(slug="slim-restore-ws").one()
     pages_list = [p for s in restored_ws.spaces for c in s.collections for p in c.pages]
     assert len(pages_list) == 1

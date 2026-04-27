@@ -9,6 +9,24 @@ from starlette.middleware.sessions import SessionMiddleware
 from .dependencies import verify_auth
 from .routers import auth, collections, organizations, pages, pages_global, spaces, workspaces
 
+
+def _truthy(value: str | None) -> bool:
+    return (value or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+# Refuse to start unconfigured. Anonymous mode bypasses all RBAC, so it must
+# only be enabled via explicit opt-in (MARROW_ALLOW_ANONYMOUS=true) — typically
+# only in local dev. Production deploys must set OIDC_ISSUER or API_KEY.
+_oidc_enabled = bool((os.getenv("OIDC_ISSUER") or "").strip())
+_api_key_set = bool((os.getenv("API_KEY") or "").strip())
+_allow_anonymous = _truthy(os.getenv("MARROW_ALLOW_ANONYMOUS"))
+if not (_oidc_enabled or _api_key_set or _allow_anonymous):
+    raise RuntimeError(
+        "Refusing to start: no authentication is configured. "
+        "Set OIDC_ISSUER (preferred), API_KEY, or MARROW_ALLOW_ANONYMOUS=true "
+        "(local dev only — bypasses all access control)."
+    )
+
 # Allow the origin list to be overridden via env var for non-local deployments.
 _cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 

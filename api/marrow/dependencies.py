@@ -15,27 +15,20 @@ from fastapi import Header, HTTPException, Request
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from .db import _database_url
 from .search import PostgresSearchBackend, SearchBackend
 from .storage import StorageAdapter, get_default_adapter
 
 # Load .env so the module works when run directly (uvicorn main:app) without
-# an externally-set DATABASE_URL environment variable.
+# externally-set environment variables.
 load_dotenv()
 
 # ---------------------------------------------------------------------------
 # Database
 # ---------------------------------------------------------------------------
 
-
-def _require_database_url() -> str:
-    url = os.getenv("DATABASE_URL")
-    if not url:
-        raise RuntimeError("DATABASE_URL is not set — copy api/.env.example to api/.env")
-    return url
-
-
 # pool_pre_ping tests the connection on checkout — handles DB restarts cleanly.
-_engine = create_engine(_require_database_url(), pool_pre_ping=True)
+_engine = create_engine(_database_url(), pool_pre_ping=True)
 
 
 def get_db() -> Generator[Session, None, None]:

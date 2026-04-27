@@ -2,7 +2,9 @@
 
 **Your knowledge, owned outright. No landlords. No lock-in. No surprises.**
 
-Marrow is an open-source, sovereign knowledge base for teams and individuals who are done trusting platforms with their work. It is built around one non-negotiable principle: if you have your data, you can always come back. Export, wipe, restore. Every time. No exceptions.
+Marrow is a self-hosted, open-source knowledge base built on one non-negotiable principle: if you have your data, you can always come back. Export, wipe, restore. Every time. No exceptions.
+
+📖 **[Read the docs](./docs/)** for installation, deployment, and configuration guides.
 
 ---
 
@@ -18,158 +20,93 @@ Marrow is built on the opposite assumption. You should be able to leave at any t
 
 These are not aspirations. They are constraints that every architectural and product decision must respect.
 
-**1. Restore guarantee**
-If you have a Marrow export bundle, you can restore your entire workspace exactly as it was. Assets, pages, links, revision history, metadata. All of it. If a restore test fails, the export is broken and that is a critical bug.
+1. **Restore guarantee** — A Marrow export bundle is restorable to an exact replica of the original workspace. A failing restore test is a critical bug.
+2. **Transparent format** — Markdown, JSON, attachments in a zip. No proprietary blobs.
+3. **Append-only history** — Every save creates a revision. Old revisions are never modified or deleted (enforced by a database trigger).
+4. **Pluggable storage** — Local filesystem today, S3 / R2 next. Business logic never bypasses the storage adapter.
+5. **Self-hosted by default** — Your data stays on infrastructure you control.
 
-**2. Transparent data format**
-The export format is documented, human-readable, and boring on purpose. Markdown files, attachments, a JSON manifest, a link graph. No proprietary binary blobs. No surprises. A person with basic technical literacy should be able to read a Marrow export without any tooling.
-
-**3. Append-only revision history**
-Nothing is ever silently overwritten. Every save creates a revision. You can reconstruct the state of any page at any point in time. Data loss is not a known failure mode.
-
-**4. Pluggable storage**
-Marrow does not care where your data lives. Local disk, S3-compatible object storage, Azure Blob — the storage layer is an interface, not a hard dependency. You bring the storage. Marrow brings the structure.
-
-**5. Self-hosted by default, cloud by choice**
-Marrow can be deployed on your own infrastructure or used as a hosted service. Either way, the data ownership model does not change. The hosted version is a convenience, not a trap.
+See **[Restore guarantee](./docs/src/content/docs/concepts/restore-guarantee.md)** for the full explanation.
 
 ---
 
-## What Marrow is (v0.1 MVP)
+## What Marrow is (v0.1)
 
-The first version does one thing well: it is a wiki that cannot lose your data.
-
-- Pages organized in a tree: Workspaces → Spaces → Collections → Pages
-- Block-based editor (Markdown blocks to start, structured blocks to follow)
+- Pages organized in a tree: Organizations → Workspaces → Spaces → Collections → Pages
+- BlockNote-powered editor with code blocks, tables, page links, and `@` mentions
 - File attachments
-- Full-text search
-- Version history on every save
-- Export: a single command produces a zip bundle containing Markdown files, assets, a `manifest.json`, and a full link graph
-- Restore: a single command rehydrates a workspace from a bundle
-- Storage adapter interface: local filesystem first, S3-compatible next
-
-That's it. No task sync, no approvals workflow, no governance features. Those come later. The MVP is the foundation that earns the right to build everything else.
+- Full-text search across a workspace
+- Append-only revision history on every save
+- One-command export to a transparent zip bundle (full or slim)
+- One-command restore from any export bundle (forwards-compatible across versions)
+- OIDC authentication with org-level RBAC (owner / editor / viewer)
+- Pluggable storage (local filesystem; S3 / R2 next)
 
 ---
 
-## What Marrow becomes (roadmap direction)
+## Quickstart (development)
 
-Marrow is designed to grow toward being the layer where knowledge and execution meet, with the same ownership philosophy running through all of it.
+**Prerequisites:** Python 3.11+, Node.js 20+, Docker.
 
-- **Two-way task integration**: tasks as first-class objects, synced bidirectionally with external systems (not just "create task" buttons)
-- **Content lifecycle**: Draft → Reviewed → Approved → Archived, with audit trail
-- **Governance-lite**: permissions, audit log, retention policies — without requiring an IT department to operate
-- **Bring-your-own storage**: connect your own S3 bucket, Azure Blob, or local volume
-- **Optional client-side encryption**: for sensitive spaces where even the server should not see plaintext
+```bash
+git clone https://github.com/spmcgraw/marrow.git
+cd marrow
+
+# Database
+docker compose up -d
+
+# Backend
+cd api
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+cp .env.example .env
+alembic upgrade head
+uvicorn main:app --reload         # http://localhost:8000
+```
+
+In a second terminal:
+
+```bash
+cd web
+npm install
+cp .env.local.example .env.local
+npm run dev                       # http://localhost:3000
+```
+
+For more depth see **[Quickstart](./docs/src/content/docs/getting-started/quickstart.md)**.
+
+---
+
+## Production deployment
+
+- **[Docker Compose](./docs/src/content/docs/deployment/docker-compose.md)** — recommended. Build images, configure `.env`, `docker compose -f docker-compose.prod.yml up`.
+- **[Cloudflare](./docs/src/content/docs/deployment/cloudflare.md)** — Pages + Containers + Neon + R2 (config landed in v0.1.0; full deploy finalized in [#41](https://github.com/spmcgraw/marrow/issues/41)).
+
+See **[Environment variables](./docs/src/content/docs/configuration/env-vars.md)** for the full config reference and **[OIDC](./docs/src/content/docs/configuration/oidc.md)** for sign-in setup.
 
 ---
 
 ## Tech stack
 
-- **Backend**: FastAPI (Python)
-- **Database**: PostgreSQL
-- **Search**: PostgreSQL full-text search initially, Meilisearch or OpenSearch later
-- **Storage**: local filesystem abstraction with adapter interface
-- **Frontend**: Next.js (React)
+| Layer | Choice |
+| --- | --- |
+| Backend | FastAPI, SQLAlchemy, Alembic |
+| Database | PostgreSQL 16 |
+| Frontend | Next.js 16, React 19, Tailwind 4, Base UI, BlockNote |
+| Auth | OIDC (any provider) + API key fallback |
+| Search | PostgreSQL FTS (Meilisearch later) |
+| Storage | Local filesystem (S3-compatible adapter next) |
+| CLI | Typer (`marrow export`, `marrow restore`) |
 
 ---
 
-## Data model (core)
-
-```text
-workspaces
-spaces
-collections
-pages
-blocks
-attachments
-revisions        ← append-only, every save
-audit_events
-tasks            ← future
-task_integrations ← future
-```
-
-The revision table is the heart of the restore guarantee. Current page state points to the latest revision. History is never deleted.
-
----
-
-## Export bundle format
-
-A Marrow export bundle is a `.zip` file with the following structure:
-
-```text
-marrow-export-{workspace-slug}-{timestamp}.zip
-├── manifest.json          # workspace metadata, export timestamp, schema version
-├── pages/
-│   └── {page-id}.md       # page content in Markdown
-├── assets/
-│   └── {asset-id}.{ext}   # original attachments
-├── revisions/
-│   └── {page-id}/
-│       └── {revision-id}.md
-└── links.json             # full link graph: internal links, broken links, orphans
-```
-
-The restore guarantee means: given this bundle and a fresh Marrow installation, `marrow restore --bundle <file>` reproduces the workspace exactly. Asset hashes are verified on restore. If they do not match, the restore fails loudly.
-
----
-
-## Getting started (development)
-
-**Prerequisites:** Python 3.11+, Node.js 20+, Docker (for PostgreSQL)
-
-### 1. Start PostgreSQL
+## Tests
 
 ```bash
-docker compose up -d
-```
-
-This starts PostgreSQL on port 5433 using the credentials in `docker-compose.yml`.
-
-### 2. Backend (FastAPI)
-
-```bash
-cd api
-
-# Create and activate a virtual environment
-python3 -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -e ".[dev]"
-
-# Configure environment
-cp .env.example .env             # defaults work with the Docker Compose DB
-
-# Run database migrations
-alembic upgrade head
-
-# Start the API server (http://localhost:8000)
-uvicorn main:app --reload
-```
-
-The interactive API docs are at `http://localhost:8000/docs`.
-
-### 3. Frontend (Next.js)
-
-In a separate terminal:
-
-```bash
-cd web
-npm install
-cp .env.local.example .env.local # set NEXT_PUBLIC_API_URL (and API key if used)
-npm run dev                      # http://localhost:3000
-```
-
-Open `http://localhost:3000` — you'll land on the workspace list. Create a workspace, then add spaces, collections, and pages from the sidebar.
-
-### Running tests
-
-```bash
-cd api
-source .venv/bin/activate
-pytest                           # all tests
-pytest tests/test_round_trip.py  # export/restore round-trip only
+cd api && pytest                            # full suite (integration tests use a real DB)
+cd api && pytest tests/test_round_trip.py   # the restore-guarantee regression anchor
+cd web && npm run lint && npm run build     # frontend
+cd docs && npm run build                    # docs site
 ```
 
 ---
@@ -178,7 +115,7 @@ pytest tests/test_round_trip.py  # export/restore round-trip only
 
 Marrow is open source because the philosophy demands it. A sovereign knowledge base built behind closed doors would be a contradiction.
 
-If you want to contribute, start with the issues labeled `good first issue`. Before writing code, read the restore guarantee section above. Any contribution that compromises the export/restore round-trip will not be merged.
+Before writing code, read the **[Restore guarantee](./docs/src/content/docs/concepts/restore-guarantee.md)**. Any contribution that compromises the export/restore round-trip will not be merged.
 
 ---
 

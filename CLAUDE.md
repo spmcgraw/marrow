@@ -184,7 +184,25 @@ marrow/
 │   │   └── utils.ts
 │   └── hooks/
 │
-├── docker-compose.yml                # PostgreSQL 16 (port 5433)
+├── docs/                             # Astro Starlight docs site (user-facing)
+│   ├── astro.config.mjs              # Sidebar nav + site metadata
+│   ├── package.json
+│   └── src/content/docs/             # Markdown/MDX content (getting-started, deployment, configuration, concepts)
+│
+├── references/                       # Internal-only reference docs (PRDs, brand)
+│   └── design-tokens.md              # Marrow's brand reference — NOT published
+│
+├── api/Dockerfile                    # Multi-stage Python 3.12 image
+├── web/Dockerfile                    # Multi-stage Node 20 image (Next.js standalone)
+├── api/wrangler.toml                 # Cloudflare Containers config for the API
+├── web/wrangler.toml                 # Cloudflare Pages config for the web app
+├── docker-compose.yml                # Dev: PostgreSQL 16 only (port 5433)
+├── docker-compose.prod.yml           # Prod: db + api + web stack
+├── .env.prod.example                 # Prod env vars (root, used by compose)
+├── .github/workflows/
+│   ├── ci.yml                        # PR + push: api lint+test, web build, docs build
+│   ├── release.yml                   # main + tags: build/push GHCR, deploy to Cloudflare
+│   └── codeql.yml                    # Weekly CodeQL analysis
 ├── CLAUDE.md                         # This file
 ├── README.md
 └── LICENSE                           # Apache 2.0
