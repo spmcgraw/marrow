@@ -46,7 +46,7 @@ uvicorn main:app --reload         # starts on http://localhost:8000
 # Frontend
 cd web
 npm install
-cp .env.local.example .env.local  # set NEXT_PUBLIC_API_URL and NEXT_PUBLIC_API_KEY
+cp .env.local.example .env.local  # optionally override MARROW_API_URL / MARROW_API_KEY
 npm run dev                       # starts on http://localhost:3000
 ```
 
@@ -72,10 +72,12 @@ CORS_ORIGINS=http://localhost:3000
 
 **Frontend (`web/.env.local`)**:
 
+Read at runtime (not build time) — the container generates `/public/config.js` from these at startup, so the prebuilt image works for any deployment without rebuilding. In dev (`npm run dev`), defaults work; only set these to override.
+
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_API_KEY=         # must match API_KEY in backend .env if set
-NEXT_PUBLIC_OIDC_ENABLED=    # set to "true" when OIDC is configured on the backend
+# MARROW_API_URL=http://localhost:8000   # browser-visible API origin
+# MARROW_API_KEY=                        # must match API_KEY in backend .env if set
+# MARROW_OIDC_ENABLED=                   # "true" when OIDC is configured on the backend
 ```
 
 ---

@@ -44,15 +44,16 @@ Set `OIDC_ISSUER` to enable. All other OIDC vars are required when enabled.
 
 See [OIDC](/configuration/oidc/) for setup walkthroughs.
 
-## Frontend (`web/.env.local`)
+## Frontend (`web/.env.local` for dev, container env for prod)
 
-`NEXT_PUBLIC_*` vars are inlined into the JS bundle at build time. Changing them requires a rebuild.
+These are read at **runtime**, not build time. The container generates a small `/config.js` file from these env vars at startup, so the same prebuilt image works in any deployment without rebuilding.
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | URL the browser uses to reach the API. |
-| `NEXT_PUBLIC_API_KEY` | unset | If `API_KEY` is set on the backend, set this to match. |
-| `NEXT_PUBLIC_OIDC_ENABLED` | unset | Set to `true` when OIDC is configured on the backend. Enables the `/login` route and route-protection middleware. |
+| `MARROW_API_URL` | `http://localhost:8000` | URL the browser uses to reach the API. Must be reachable from end-user browsers. |
+| `MARROW_API_KEY` | unset | If `API_KEY` is set on the backend, set this to match. |
+| `MARROW_OIDC_ENABLED` | unset | Set to `true` when OIDC is configured on the backend. Enables the `/login` route and route-protection middleware. |
+| `INTERNAL_API_URL` | same as `MARROW_API_URL` | URL Next.js uses for SSR fetches inside the Docker network. Set to `http://api:8000` in the prod compose file. |
 
 ## Production compose root `.env`
 

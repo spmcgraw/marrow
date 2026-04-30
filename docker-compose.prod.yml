@@ -24,8 +24,6 @@ services:
       retries: 5
 
   api:
-    build:
-      context: ./api
     image: ghcr.io/spmcgraw/marrow-api:${MARROW_VERSION:-latest}
     restart: unless-stopped
     depends_on:
@@ -58,19 +56,18 @@ services:
              uvicorn main:app --host 0.0.0.0 --port 8000"
 
   web:
-    build:
-      context: ./web
-      args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-        NEXT_PUBLIC_API_KEY: ${NEXT_PUBLIC_API_KEY:-}
-        NEXT_PUBLIC_OIDC_ENABLED: ${NEXT_PUBLIC_OIDC_ENABLED:-}
     image: ghcr.io/spmcgraw/marrow-web:${MARROW_VERSION:-latest}
     restart: unless-stopped
     depends_on:
       - api
     environment:
-      # SSR inside the docker network can't reach NEXT_PUBLIC_API_URL
-      # (which is the public/browser origin). Reach the api by service name.
+      # Browser-visible config — written to /public/config.js at container
+      # startup by docker-entrypoint.sh, then loaded by the layout.
+      MARROW_API_URL: ${MARROW_API_URL:?MARROW_API_URL is required}
+      MARROW_API_KEY: ${MARROW_API_KEY:-}
+      MARROW_OIDC_ENABLED: ${MARROW_OIDC_ENABLED:-false}
+      # SSR inside the docker network can't reach MARROW_API_URL
+      # (the public/browser origin). Reach the api by service name.
       INTERNAL_API_URL: http://api:8000
     ports:
       - "${WEB_PORT:-3000}:3000"

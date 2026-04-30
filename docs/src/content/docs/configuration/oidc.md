@@ -27,14 +27,14 @@ SECRET_KEY=<long random string>
 CORS_ORIGINS=https://app.example.com
 ```
 
-And on the frontend (`web/.env.local`):
+And on the frontend (web container env, or `web/.env.local` for dev):
 
 ```env
-NEXT_PUBLIC_API_URL=https://api.example.com
-NEXT_PUBLIC_OIDC_ENABLED=true
+MARROW_API_URL=https://api.example.com
+MARROW_OIDC_ENABLED=true
 ```
 
-`NEXT_PUBLIC_OIDC_ENABLED` enables the `/login` page and route-protection middleware. Without it the frontend assumes anonymous mode.
+`MARROW_OIDC_ENABLED` enables the `/login` page and route-protection middleware. Without it the frontend assumes anonymous mode.
 
 ## Cookie domain
 
