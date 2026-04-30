@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const OIDC_ENABLED = process.env.NEXT_PUBLIC_OIDC_ENABLED === "true";
+import { getApiUrl, getOidcEnabled } from "@/lib/runtime-config";
 
 export default function LoginPage() {
-  if (!OIDC_ENABLED) {
+  if (!getOidcEnabled()) {
     redirect("/workspaces");
   }
+
+  const apiUrl = getApiUrl();
 
   return (
     <div className="flex min-h-screen items-center justify-center">
@@ -18,7 +18,7 @@ export default function LoginPage() {
           </p>
         </div>
         <a
-          href={`${API_URL}/api/auth/login`}
+          href={`${apiUrl}/api/auth/login`}
           className="inline-flex h-9 w-full items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           Sign in with SSO

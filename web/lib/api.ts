@@ -5,6 +5,7 @@
  * and throws a descriptive error on non-2xx responses.
  */
 
+import { getApiKey, getApiUrl, getInternalApiUrl } from "./runtime-config";
 import type {
   Attachment,
   AuthStatus,
@@ -19,21 +20,20 @@ import type {
   WorkspaceTree,
 } from "./types";
 
-// Browser uses NEXT_PUBLIC_API_URL (the user-facing origin).
-// SSR inside Docker can't reach that origin from within the container, so
-// it uses INTERNAL_API_URL (the docker-network service name) when set.
-const BROWSER_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const SERVER_BASE_URL = process.env.INTERNAL_API_URL ?? BROWSER_BASE_URL;
-const BASE_URL = typeof window === "undefined" ? SERVER_BASE_URL : BROWSER_BASE_URL;
-const API_KEY = process.env.NEXT_PUBLIC_API_KEY ?? "";
+// Resolve URLs per-call so runtime config changes (e.g. operator updates env
+// then restarts the container) take effect without rebuilding.
+function baseUrl(): string {
+  return typeof window === "undefined" ? getInternalApiUrl() : getApiUrl();
+}
 
 async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
+  const apiKey = getApiKey();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(API_KEY ? { "X-API-Key": API_KEY } : {}),
+    ...(apiKey ? { "X-API-Key": apiKey } : {}),
     ...(options.headers as Record<string, string>),
   };
 
@@ -47,7 +47,7 @@ async function apiFetch<T>(
     }
   }
 
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${baseUrl()}${path}`, {
     ...options,
     headers,
     credentials: "include", // send cookies for cross-origin OIDC auth
@@ -57,7 +57,7 @@ async function apiFetch<T>(
   if (!res.ok) {
     // Client-side 401: redirect to OIDC login
     if (res.status === 401 && typeof window !== "undefined") {
-      window.location.href = `${BASE_URL}/api/auth/login`;
+      window.location.href = `${baseUrl()}/api/auth/login`;
       return new Promise(() => {}); // page is navigating away
     }
     const text = await res.text().catch(() => res.statusText);
@@ -100,18 +100,18 @@ export function getExportSizeEstimate(
 }
 
 export function exportWorkspaceUrl(workspaceId: string, slim: boolean): string {
-  const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
   const params = slim ? "?slim=true" : "";
-  return `${base}/api/workspaces/${workspaceId}/export${params}`;
+  return `${getApiUrl()}/api/workspaces/${workspaceId}/export${params}`;
 }
 
 export async function restoreWorkspace(file: File): Promise<Workspace> {
   const form = new FormData();
   form.append("bundle", file);
 
-  const headers: Record<string, string> = API_KEY ? { "X-API-Key": API_KEY } : {};
+  const apiKey = getApiKey();
+  const headers: Record<string, string> = apiKey ? { "X-API-Key": apiKey } : {};
 
-  const res = await fetch(`${BASE_URL}/api/workspaces/restore`, {
+  const res = await fetch(`${baseUrl()}/api/workspaces/restore`, {
     method: "POST",
     body: form,
     headers,
@@ -224,10 +224,11 @@ export async function uploadAttachment(
   const form = new FormData();
   form.append("file", file);
 
-  const headers: Record<string, string> = API_KEY ? { "X-API-Key": API_KEY } : {};
+  const apiKey = getApiKey();
+  const headers: Record<string, string> = apiKey ? { "X-API-Key": apiKey } : {};
 
   const res = await fetch(
-    `${BASE_URL}/api/collections/${collectionId}/pages/${pageId}/attachments`,
+    `${baseUrl()}/api/collections/${collectionId}/pages/${pageId}/attachments`,
     { method: "POST", body: form, headers, credentials: "include" }
   );
 
@@ -239,7 +240,7 @@ export async function uploadAttachment(
 }
 
 export function attachmentFileUrl(collectionId: string, pageId: string, attachmentId: string): string {
-  return `${BASE_URL}/api/collections/${collectionId}/pages/${pageId}/attachments/${attachmentId}/file`;
+  return `${baseUrl()}/api/collections/${collectionId}/pages/${pageId}/attachments/${attachmentId}/file`;
 }
 
 // ---------------------------------------------------------------------------

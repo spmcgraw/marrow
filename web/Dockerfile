@@ -15,13 +15,8 @@ COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
-ARG NEXT_PUBLIC_API_URL
-ARG NEXT_PUBLIC_API_KEY
-ARG NEXT_PUBLIC_OIDC_ENABLED
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
-    NEXT_PUBLIC_API_KEY=$NEXT_PUBLIC_API_KEY \
-    NEXT_PUBLIC_OIDC_ENABLED=$NEXT_PUBLIC_OIDC_ENABLED
-
+# Public env vars are injected at runtime via /public/config.js (see
+# docker-entrypoint.sh), so nothing about them is baked into the bundle.
 RUN npm run build
 
 
@@ -37,12 +32,16 @@ ENV NODE_ENV=production \
 RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+COPY --chown=nextjs:nodejs docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 USER nextjs
 
 EXPOSE 3000
 
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "server.js"]

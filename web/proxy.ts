@@ -10,8 +10,9 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // If OIDC is not enabled, skip auth checks
-  if (process.env.NEXT_PUBLIC_OIDC_ENABLED !== "true") {
+  // If OIDC is not enabled, skip auth checks. Read at runtime — middleware
+  // runs server-side, so non-NEXT_PUBLIC_ env vars are available.
+  if (process.env.MARROW_OIDC_ENABLED !== "true") {
     return NextResponse.next();
   }
 
