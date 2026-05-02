@@ -3,7 +3,7 @@
 These models mirror the Alembic migration exactly, including:
 - Server-side UUID primary keys (gen_random_uuid())
 - Server-side timestamps (now())
-- Deferred FK: pages.current_revision_id → revisions.id
+- Deferred FK: nodes.current_revision_id → revisions.id
 - attachments.hash NOT NULL
 """
 
@@ -13,6 +13,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     BigInteger,
+    CheckConstraint,
     DateTime,
     ForeignKeyConstraint,
     Text,
@@ -121,76 +122,67 @@ class Space(Base):
     )
 
     workspace: Mapped["Workspace"] = relationship(back_populates="spaces")
-    collections: Mapped[list["Collection"]] = relationship(
-        back_populates="space", passive_deletes=True
-    )
+    nodes: Mapped[list["Node"]] = relationship(back_populates="space", passive_deletes=True)
 
 
-class Collection(Base):
-    __tablename__ = "collections"
+class Node(Base):
+    __tablename__ = "nodes"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
     )
     space_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    slug: Mapped[str] = mapped_column(Text, nullable=False)
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    type: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-
-    __table_args__ = (
-        UniqueConstraint("space_id", "slug"),
-        ForeignKeyConstraint(["space_id"], ["spaces.id"], ondelete="CASCADE"),
-    )
-
-    space: Mapped["Space"] = relationship(back_populates="collections")
-    pages: Mapped[list["Page"]] = relationship(back_populates="collection", passive_deletes=True)
-
-
-class Page(Base):
-    __tablename__ = "pages"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
-    )
-    collection_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     slug: Mapped[str] = mapped_column(Text, nullable=False)
-    title: Mapped[str] = mapped_column(Text, nullable=False)
-    # Nullable until a revision exists; deferred FK defined in __table_args__
+    position: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     current_revision_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     # Managed by database triggers — never set from application code.
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
     __table_args__ = (
-        UniqueConstraint("collection_id", "slug"),
-        ForeignKeyConstraint(["collection_id"], ["collections.id"], ondelete="CASCADE"),
-        # Deferred so a page and its first revision can be inserted in the same
-        # transaction without ordering constraints.
+        ForeignKeyConstraint(["space_id"], ["spaces.id"], ondelete="CASCADE"),
+        ForeignKeyConstraint(["parent_id"], ["nodes.id"], ondelete="CASCADE"),
+        # Deferred so a node and its first revision can be inserted in the
+        # same transaction without ordering constraints.
         ForeignKeyConstraint(
             ["current_revision_id"],
             ["revisions.id"],
-            name="fk_pages_current_revision",
+            name="fk_nodes_current_revision",
             deferrable=True,
             initially="DEFERRED",
         ),
+        CheckConstraint("type IN ('folder', 'page')", name="nodes_type_valid"),
+        CheckConstraint(
+            "(type = 'folder' AND current_revision_id IS NULL AND search_vector IS NULL)"
+            " OR (type = 'page' AND description IS NULL)",
+            name="nodes_shape_by_type",
+        ),
     )
 
-    collection: Mapped["Collection"] = relationship(back_populates="pages")
+    space: Mapped["Space"] = relationship(back_populates="nodes")
+    parent: Mapped["Node | None"] = relationship(back_populates="children", remote_side="Node.id")
+    children: Mapped[list["Node"]] = relationship(back_populates="parent", passive_deletes=True)
     current_revision: Mapped["Revision | None"] = relationship(
-        foreign_keys="[Page.current_revision_id]"
+        foreign_keys="[Node.current_revision_id]"
     )
     revisions: Mapped[list["Revision"]] = relationship(
-        back_populates="page",
-        foreign_keys="[Revision.page_id]",
+        back_populates="node",
+        foreign_keys="[Revision.node_id]",
         order_by="Revision.created_at",
         passive_deletes=True,
     )
     attachments: Mapped[list["Attachment"]] = relationship(
-        back_populates="page", passive_deletes=True
+        back_populates="node", passive_deletes=True
     )
 
 
@@ -200,7 +192,7 @@ class Revision(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
     )
-    page_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    node_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     # 'markdown' for legacy plain-text revisions; 'json' for BlockNote JSON revisions.
     content_format: Mapped[str] = mapped_column(Text, nullable=False, server_default="markdown")
@@ -208,10 +200,10 @@ class Revision(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
-    __table_args__ = (ForeignKeyConstraint(["page_id"], ["pages.id"], ondelete="CASCADE"),)
+    __table_args__ = (ForeignKeyConstraint(["node_id"], ["nodes.id"], ondelete="CASCADE"),)
 
-    page: Mapped["Page"] = relationship(
-        back_populates="revisions", foreign_keys="[Revision.page_id]"
+    node: Mapped["Node"] = relationship(
+        back_populates="revisions", foreign_keys="[Revision.node_id]"
     )
 
 
@@ -221,7 +213,7 @@ class Attachment(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
     )
-    page_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    node_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     filename: Mapped[str] = mapped_column(Text, nullable=False)
     hash: Mapped[str] = mapped_column(Text, nullable=False)
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
@@ -229,9 +221,9 @@ class Attachment(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
-    __table_args__ = (ForeignKeyConstraint(["page_id"], ["pages.id"], ondelete="CASCADE"),)
+    __table_args__ = (ForeignKeyConstraint(["node_id"], ["nodes.id"], ondelete="CASCADE"),)
 
-    page: Mapped["Page"] = relationship(back_populates="attachments")
+    node: Mapped["Node"] = relationship(back_populates="attachments")
 
 
 class User(Base):

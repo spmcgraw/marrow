@@ -1,3 +1,7 @@
+# ruff: noqa: F821
+# (#123) v3 restore logic below references the removed Page/Collection ORM
+# classes; these calls NameError at runtime. The v3 → v4 migration lands in
+# #133 (2.0k), which will reference this code as the legacy bundle reader.
 """Restore a workspace from an export bundle.
 
 Usage:
@@ -13,7 +17,11 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from .models import Attachment, Collection, Organization, Page, Revision, Space, Workspace
+from .models import Attachment, Organization, Revision, Space, Workspace
+
+# NOTE (#123): Page/Collection imports removed; the v3 restore logic below still
+# references them and will NameError at call time. Rewrite for the node-tree
+# data model lands in #133 (2.0k) — v3 → v4 bundle migration.
 from .storage import StorageAdapter
 
 

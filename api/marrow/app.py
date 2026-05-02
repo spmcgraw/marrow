@@ -7,7 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from .dependencies import verify_auth
-from .routers import auth, collections, organizations, pages, pages_global, spaces, workspaces
+from .routers import auth, organizations, spaces, workspaces
+
+# Note: collections, pages, and pages_global routers were removed as part of the
+# v0.2 node-tree migration (#123). Node-based replacements land in #124 (2.0b).
 
 
 def _truthy(value: str | None) -> bool:
@@ -55,9 +58,6 @@ _auth = [Depends(verify_auth)]
 app.include_router(organizations.router, dependencies=_auth)
 app.include_router(workspaces.router, dependencies=_auth)
 app.include_router(spaces.router, dependencies=_auth)
-app.include_router(collections.router, dependencies=_auth)
-app.include_router(pages.router, dependencies=_auth)
-app.include_router(pages_global.router, dependencies=_auth)
 
 
 @app.get("/health")
