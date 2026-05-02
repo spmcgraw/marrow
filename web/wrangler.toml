@@ -1,14 +1,18 @@
 # Cloudflare Pages config for the Marrow web frontend.
 #
 # Build:
-#   npm run pages:build
+#   npm run pages:build          # runs next-on-pages against next.config.pages.ts
 # Deploy:
-#   npm run pages:deploy
+#   npm run pages:deploy         # wrangler pages deploy .vercel/output/static
+#
+# Note: @cloudflare/next-on-pages support for Next.js 16 is pre-release.
+# The infrastructure is in place; re-run pages:build once support lands.
 
 name = "marrow-web"
 compatibility_date = "2025-10-01"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = ".vercel/output/static"
+# Build command for the Pages dashboard: npm run pages:build
 
 [vars]
 # Public env baked at build time. Override per-environment in the Pages dashboard.
