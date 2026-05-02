@@ -24,8 +24,17 @@ max_instances = 5
 port = 8000
 
 [vars]
-STORAGE_PATH = "/data/storage"
 CORS_ORIGINS = "https://app.marrow.so"
 FRONTEND_URL = "https://app.marrow.so"
 COOKIE_DOMAIN = ".marrow.so"
+STORAGE_BACKEND = "r2"
 # OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_REDIRECT_URI: set per environment.
+#
+# Secrets — configure via `wrangler secret put` (never store values here):
+#   wrangler secret put SECRET_KEY
+#   wrangler secret put DATABASE_URL        # Neon pooled endpoint
+#   wrangler secret put R2_ENDPOINT_URL
+#   wrangler secret put R2_ACCESS_KEY_ID
+#   wrangler secret put R2_SECRET_ACCESS_KEY
+#   wrangler secret put R2_BUCKET
+#   wrangler secret put OIDC_CLIENT_SECRET  # if using OIDC
