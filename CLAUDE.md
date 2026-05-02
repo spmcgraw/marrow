@@ -144,10 +144,9 @@ marrow/
 │   │       ├── auth.py               # OIDC login/callback/me/logout + personal org creation
 │   │       ├── organizations.py      # Org CRUD, member management (invite, role, remove)
 │   │       ├── workspaces.py
-│   │       ├── spaces.py
-│   │       ├── collections.py
-│   │       ├── pages.py              # Scoped page routes (under collection)
-│   │       └── pages_global.py       # Global page routes (UUID-scoped, no collection_id)
+│   │       └── spaces.py
+│   │       # Node CRUD/tree routes land in #124 (2.0b); old collection/page routers
+│   │       # were removed by the v0.2 schema migration (#123).
 │   ├── tests/
 │   │   ├── test_models_smoke.py
 │   │   ├── test_migration_cycle.py
@@ -218,9 +217,9 @@ marrow/
 
 ```text
 organizations → org_memberships (user roles: owner/editor/viewer)
-             → workspaces → spaces → collections → pages → blocks (future)
-                                                         → attachments
-                                                → revisions  (append-only, every save)
+             → workspaces → spaces → nodes (self-referential tree; type ∈ {folder, page})
+                                            → revisions  (append-only, pages only)
+                                            → attachments
                               audit_events (future)
                               tasks / task_integrations (future)
 ```
@@ -233,15 +232,18 @@ organizations → org_memberships (user roles: owner/editor/viewer)
 | org_memberships | id, org_id (FK), user_id (FK, nullable for pending), email, role (owner/editor/viewer) |
 | workspaces | id, org_id (FK), slug (unique), name |
 | spaces | id, workspace_id (FK cascade), slug (unique per workspace), name |
-| collections | id, space_id (FK cascade), slug (unique per space), name |
-| pages | id, collection_id (FK cascade), slug (unique per collection), title, current_revision_id (deferred FK), search_vector (tsvector, GIN-indexed, trigger-managed) |
-| revisions | id, page_id (FK cascade), content (TEXT), content_format (TEXT: 'markdown'\|'json') — **immutable via PG trigger** |
-| attachments | id, page_id (FK cascade), filename, hash (SHA256), size_bytes |
+| nodes | id, space_id (FK cascade), parent_id (self-FK cascade, nullable for space-root), type ('folder'\|'page'), name, slug, position (TEXT — fractional index), description (folders), current_revision_id (deferred FK, pages), search_vector (tsvector, pages), deleted_at (nullable) |
+| revisions | id, node_id (FK cascade — must reference type='page'), content (TEXT), content_format ('markdown'\|'json') — **immutable via PG trigger** |
+| attachments | id, node_id (FK cascade), filename, hash (SHA256), size_bytes |
 | users | id, oidc_issuer, oidc_subject (unique together), email, name, last_login_at |
 
-**Revision immutability**: A PL/pgSQL trigger (`revisions_immutable()`) raises an exception on any `UPDATE` against the `revisions` table. This enforces the append-only constraint at the database level. `DELETE` is allowed via FK CASCADE (e.g., when a page or workspace is deleted).
+**Node shape constraint**: A CHECK constraint (`nodes_shape_by_type`) enforces that folder rows have `current_revision_id` and `search_vector` NULL, while page rows have `description` NULL. A second CHECK on `revisions` (`revisions_node_is_page`) ensures revisions only reference page-typed nodes.
 
-**Deferred FK**: `pages.current_revision_id → revisions.id` is a deferred constraint, allowing page and first revision to be created in a single transaction.
+**Slug uniqueness**: Two partial unique indexes — `(space_id, slug) WHERE parent_id IS NULL AND deleted_at IS NULL` for space-root nodes, and `(parent_id, slug) WHERE parent_id IS NOT NULL AND deleted_at IS NULL` for nested nodes. Soft-deleted rows are excluded so trash doesn't block re-creating a slug.
+
+**Revision immutability**: A PL/pgSQL trigger (`revisions_immutable()`) raises an exception on any `UPDATE` against the `revisions` table. This enforces the append-only constraint at the database level.
+
+**Deferred FK**: `nodes.current_revision_id → revisions.id` is a deferred constraint, allowing a node and its first revision to be created in a single transaction.
 
 ### API Routes Summary
 
@@ -269,17 +271,8 @@ All routes are prefixed with `/api`. Authentication is enforced via session cook
 | POST | /api/workspaces/restore | Restore a workspace from an uploaded export bundle zip | — |
 | GET/POST | /api/workspaces/{id}/spaces/ | List / create spaces | viewer/editor |
 | GET/DELETE | /api/workspaces/{id}/spaces/{sid} | Get / delete space | viewer/owner |
-| GET/POST | /api/spaces/{sid}/collections/ | List / create collections | viewer/editor |
-| GET/DELETE | /api/spaces/{sid}/collections/{cid} | Get / delete collection | viewer/owner |
-| GET/POST | /api/collections/{cid}/pages/ | List / create pages | viewer/editor |
-| GET/PATCH/DELETE | /api/collections/{cid}/pages/{pid} | Get / update / delete page | viewer/editor/owner |
-| GET | /api/collections/{cid}/pages/{pid}/revisions | List revisions | viewer |
-| GET | /api/collections/{cid}/pages/{pid}/revisions/{rid} | Single revision | viewer |
-| GET/POST | /api/collections/{cid}/pages/{pid}/attachments | List / upload attachments | viewer/editor |
-| GET | /api/collections/{cid}/pages/{pid}/attachments/{aid}/file | Download attachment | viewer |
-| GET/PATCH | /api/pages/{pid} | Global page get / update (no collection_id needed) | viewer/editor |
-| GET | /api/pages/{pid}/revisions | Global revision list | viewer |
-| GET | /api/pages/{pid}/revisions/{rid} | Global single revision | viewer |
+
+> **Note (#123 → #124):** v0.1's collection-scoped and global page routes were removed by the schema migration. Node CRUD/tree/attachment/revision routes land in #124 (2.0b) under `/api/nodes/...` and `/api/spaces/{sid}/nodes`. The workspace `/tree`, `/search`, `/export`, and `/restore` endpoints are still wired but their handlers will NameError at runtime until the node-aware rewrites land in #124, #125, #132, and #133.
 
 ### Storage Adapter Interface
 

@@ -13,13 +13,15 @@ from sqlalchemy.orm import Session
 
 from .dependencies import AuthContext, get_db, verify_auth
 from .models import (
-    Collection,
     OrgMembership,
     OrgRole,
-    Page,
     Space,
     Workspace,
 )
+
+# require_collection_role / require_page_role removed in #123 — collection and
+# page routers no longer exist. A node-based replacement (require_node_role)
+# lands in #124 (2.0b).
 
 ROLE_HIERARCHY: dict[OrgRole, int] = {
     OrgRole.VIEWER: 0,
@@ -95,51 +97,6 @@ def require_space_role(min_role: OrgRole):
         ).scalar_one_or_none()
         if org_id is None:
             raise HTTPException(404, "Space not found")
-        _check_membership(db, org_id, auth, min_role)
-        return auth
-
-    return _dep
-
-
-def require_collection_role(min_role: OrgRole):
-    """Dependency factory: resolve collection_id → space → workspace → org."""
-
-    def _dep(
-        collection_id: uuid.UUID,
-        db: Session = Depends(get_db),
-        auth: AuthContext = Depends(verify_auth),
-    ) -> AuthContext:
-        org_id = db.execute(
-            select(Workspace.org_id)
-            .join(Space, Space.workspace_id == Workspace.id)
-            .join(Collection, Collection.space_id == Space.id)
-            .where(Collection.id == collection_id)
-        ).scalar_one_or_none()
-        if org_id is None:
-            raise HTTPException(404, "Collection not found")
-        _check_membership(db, org_id, auth, min_role)
-        return auth
-
-    return _dep
-
-
-def require_page_role(min_role: OrgRole):
-    """Dependency factory: resolve page_id → collection → space → workspace → org."""
-
-    def _dep(
-        page_id: uuid.UUID,
-        db: Session = Depends(get_db),
-        auth: AuthContext = Depends(verify_auth),
-    ) -> AuthContext:
-        org_id = db.execute(
-            select(Workspace.org_id)
-            .join(Space, Space.workspace_id == Workspace.id)
-            .join(Collection, Collection.space_id == Space.id)
-            .join(Page, Page.collection_id == Collection.id)
-            .where(Page.id == page_id)
-        ).scalar_one_or_none()
-        if org_id is None:
-            raise HTTPException(404, "Page not found")
         _check_membership(db, org_id, auth, min_role)
         return auth
 

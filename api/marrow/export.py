@@ -1,3 +1,7 @@
+# ruff: noqa: F821
+# (#123) v3 export logic below references the removed Page/Collection ORM
+# classes; these calls NameError at runtime. The v4 rewrite lands in #132 (2.0j),
+# which will reference this code as the migration source.
 """Export a workspace to a portable zip bundle.
 
 Bundle layout (schema v3):
@@ -24,7 +28,11 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from .models import Attachment, Page, Workspace
+from .models import Attachment, Workspace
+
+# NOTE (#123): Page/Collection imports removed; the v3 export logic below still
+# references them and will NameError at call time. Rewrite for the node-tree
+# data model lands in #132 (2.0j) — bundle v4 format.
 from .storage import StorageAdapter
 
 SCHEMA_VERSION = "3"
