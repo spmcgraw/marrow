@@ -2,7 +2,9 @@
 
 import os
 import tempfile
+from collections import defaultdict
 from io import BytesIO
+from operator import attrgetter
 from pathlib import Path
 from uuid import UUID
 
@@ -13,11 +15,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..dependencies import AuthContext, get_db, get_search_backend, verify_auth
-from ..models import OrgMembership, OrgRole, Workspace
+from ..models import Node, OrgMembership, OrgRole, Space, Workspace
 from ..rbac import require_workspace_role
 from ..schemas import (
+    NodeTreeItem,
     SearchResponse,
     SearchResultItem,
+    SpaceTreeItem,
     WorkspaceCreate,
     WorkspaceRead,
     WorkspaceTree,
@@ -28,6 +32,30 @@ from ..storage import LocalFilesystemAdapter
 router = APIRouter(prefix="/api/workspaces", tags=["workspaces"])
 
 _MAX_BUNDLE_BYTES = 500 * 1024 * 1024  # 500 MB
+
+
+def _build_node_tree(nodes: list[Node]) -> list[NodeTreeItem]:
+    children_map: dict[UUID, list[Node]] = defaultdict(list)
+    for node in nodes:
+        if node.parent_id is not None:
+            children_map[node.parent_id].append(node)
+
+    by_position = attrgetter("position")
+
+    def to_item(node: Node) -> NodeTreeItem:
+        return NodeTreeItem(
+            id=node.id,
+            parent_id=node.parent_id,
+            type=node.type,
+            name=node.name,
+            slug=node.slug,
+            position=node.position,
+            description=node.description,
+            children=[to_item(c) for c in sorted(children_map.get(node.id, []), key=by_position)],
+        )
+
+    roots = [n for n in nodes if n.parent_id is None]
+    return [to_item(n) for n in sorted(roots, key=by_position)]
 
 
 @router.get("", response_model=list[WorkspaceRead])
@@ -140,13 +168,36 @@ def get_workspace(
 def get_workspace_tree(
     workspace_id: UUID,
     db: Session = Depends(get_db),
-    auth: AuthContext = Depends(require_workspace_role(OrgRole.VIEWER)),
-):
-    """Return the full workspace hierarchy for sidebar rendering."""
+    _: AuthContext = Depends(require_workspace_role(OrgRole.VIEWER)),
+) -> WorkspaceTree:
     ws = db.get(Workspace, workspace_id)
     if ws is None:
         raise HTTPException(status_code=404, detail="Workspace not found")
-    return ws
+
+    spaces = db.execute(select(Space).where(Space.workspace_id == workspace_id)).scalars().all()
+    space_ids = [s.id for s in spaces]
+    nodes_by_space: dict[UUID, list[Node]] = defaultdict(list)
+    if space_ids:
+        all_nodes = db.execute(
+            select(Node).where(Node.space_id.in_(space_ids), Node.deleted_at.is_(None))
+        ).scalars().all()
+        for node in all_nodes:
+            nodes_by_space[node.space_id].append(node)
+
+    return WorkspaceTree(
+        id=ws.id,
+        slug=ws.slug,
+        name=ws.name,
+        spaces=[
+            SpaceTreeItem(
+                id=s.id,
+                slug=s.slug,
+                name=s.name,
+                nodes=_build_node_tree(nodes_by_space[s.id]),
+            )
+            for s in spaces
+        ],
+    )
 
 
 @router.get("/{workspace_id}/search", response_model=SearchResponse)
