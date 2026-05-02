@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from typing import Generator
 
 from dotenv import load_dotenv
-from fastapi import Header, HTTPException, Request
-from sqlalchemy import create_engine
+from fastapi import Depends, Header, HTTPException, Request
+from sqlalchemy import create_engine, select, text as sa_text
 from sqlalchemy.orm import Session
 
 from .db import _database_url
@@ -117,3 +117,30 @@ def verify_auth(
         return AuthContext(user_id=None, email=None, method="anonymous")
 
     raise HTTPException(status_code=401, detail="Authentication required")
+
+
+def get_db_with_org(
+    auth: AuthContext = Depends(verify_auth),
+    db: Session = Depends(get_db),
+) -> Generator[Session, None, None]:
+    """Yield a session with ``app.current_org`` set for session-authenticated users.
+
+    When the requesting user authenticated via OIDC session, this dependency
+    looks up their first org membership and sets the ``app.current_org``
+    PostgreSQL session variable so RLS policies restrict rows to that org.
+
+    API key and anonymous auth leave ``app.current_org`` unset, which the RLS
+    policies treat as unrestricted access (superuser / dev mode).
+    """
+    if auth.method == "session" and auth.user_id is not None:
+        from .models import OrgMembership
+
+        membership = db.execute(
+            select(OrgMembership).where(OrgMembership.user_id == auth.user_id).limit(1)
+        ).scalar_one_or_none()
+        if membership is not None:
+            db.execute(
+                sa_text("SELECT set_config('app.current_org', :org_id, false)"),
+                {"org_id": str(membership.org_id)},
+            )
+    yield db
