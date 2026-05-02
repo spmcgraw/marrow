@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from .dependencies import AuthContext, get_db, verify_auth
 from .models import (
+    Node,
     OrgMembership,
     OrgRole,
     Space,
@@ -98,6 +99,25 @@ def require_space_role(min_role: OrgRole):
         if org_id is None:
             raise HTTPException(404, "Space not found")
         _check_membership(db, org_id, auth, min_role)
+        return auth
+
+    return _dep
+
+
+def require_node_role(min_role: OrgRole):
+    """Dependency factory: resolve node_id → space → workspace → org, then enforce role."""
+
+    def _dep(
+        node_id: uuid.UUID,
+        db: Session = Depends(get_db),
+        auth: AuthContext = Depends(verify_auth),
+    ) -> AuthContext:
+        node = db.get(Node, node_id)
+        if node is None or node.deleted_at is not None:
+            raise HTTPException(404, "Node not found")
+        space = db.get(Space, node.space_id)
+        workspace = db.get(Workspace, space.workspace_id)
+        _check_membership(db, workspace.org_id, auth, min_role)
         return auth
 
     return _dep

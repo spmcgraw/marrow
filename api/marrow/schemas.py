@@ -1,13 +1,10 @@
 """Pydantic request/response schemas for the Marrow REST API."""
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
-
-# ---------------------------------------------------------------------------
-# Shared config — all read schemas allow ORM model instances as input
-# ---------------------------------------------------------------------------
 
 
 class _ReadBase(BaseModel):
@@ -22,7 +19,7 @@ class _ReadBase(BaseModel):
 class WorkspaceCreate(BaseModel):
     slug: str
     name: str
-    org_id: UUID | None = None  # if None, uses personal org
+    org_id: UUID | None = None
 
 
 class WorkspaceRead(_ReadBase):
@@ -52,53 +49,76 @@ class SpaceRead(_ReadBase):
 
 
 # ---------------------------------------------------------------------------
-# Collection
+# Node
 # ---------------------------------------------------------------------------
 
 
-class CollectionCreate(BaseModel):
-    slug: str
+class NodeCreate(BaseModel):
+    type: Literal["folder", "page"]
     name: str
+    slug: str | None = None
+    parent_id: UUID | None = None
+    description: str | None = None
+    content: str | None = None
+    content_format: Literal["markdown", "json"] = "markdown"
 
 
-class CollectionRead(_ReadBase):
+class NodeRead(_ReadBase):
     id: UUID
     space_id: UUID
+    parent_id: UUID | None
+    type: Literal["folder", "page"]
+    name: str
+    slug: str
+    position: str
+    description: str | None
+    current_revision_id: UUID | None
+    deleted_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class NodeReadWithContent(NodeRead):
+    content: str | None = None
+    content_format: Literal["markdown", "json"] | None = None
+
+
+class NodeUpdate(BaseModel):
+    name: str | None = None
+    slug: str | None = None
+    description: str | None = None
+    content: str | None = None
+    content_format: Literal["markdown", "json"] | None = None
+    position: str | None = None
+    parent_id: UUID | None = None
+
+
+class NodeTreeItem(_ReadBase):
+    id: UUID
+    parent_id: UUID | None
+    type: Literal["folder", "page"]
+    name: str
+    slug: str
+    position: str
+    description: str | None
+    children: list["NodeTreeItem"] = []
+
+
+NodeTreeItem.model_rebuild()
+
+
+class SpaceTreeItem(_ReadBase):
+    id: UUID
     slug: str
     name: str
-    created_at: datetime
+    nodes: list[NodeTreeItem] = []
 
 
-# ---------------------------------------------------------------------------
-# Page
-# ---------------------------------------------------------------------------
-
-
-class PageCreate(BaseModel):
-    slug: str
-    title: str
-    content: str = ""  # seeds the first revision
-    content_format: str = "markdown"  # 'markdown' or 'json'
-
-
-class PageUpdate(BaseModel):
-    title: str | None = None
-    content: str | None = None  # non-None → new revision appended
-    content_format: str = "markdown"  # format of the new content
-
-
-class PageRead(_ReadBase):
+class WorkspaceTree(_ReadBase):
     id: UUID
-    collection_id: UUID
     slug: str
-    title: str
-    current_revision_id: UUID | None
-    created_at: datetime
-
-
-class PageReadWithContent(PageRead):
-    content: str | None = None  # current revision content; None if no revisions yet
-    content_format: str = "markdown"  # format of current revision content
+    name: str
+    spaces: list[SpaceTreeItem] = []
 
 
 # ---------------------------------------------------------------------------
@@ -108,13 +128,10 @@ class PageReadWithContent(PageRead):
 
 class RevisionRead(_ReadBase):
     id: UUID
-    page_id: UUID
-    content_format: str
-    created_at: datetime
-
-
-class RevisionReadWithContent(RevisionRead):
+    node_id: UUID
     content: str
+    content_format: Literal["markdown", "json"]
+    created_at: datetime
 
 
 # ---------------------------------------------------------------------------
@@ -124,46 +141,11 @@ class RevisionReadWithContent(RevisionRead):
 
 class AttachmentRead(_ReadBase):
     id: UUID
-    page_id: UUID
+    node_id: UUID
     filename: str
     hash: str
     size_bytes: int
     created_at: datetime
-
-
-# ---------------------------------------------------------------------------
-# Workspace tree (nested, for sidebar)
-# ---------------------------------------------------------------------------
-
-
-class PageTreeItem(_ReadBase):
-    id: UUID
-    collection_id: UUID
-    slug: str
-    title: str
-    current_revision_id: UUID | None
-
-
-class CollectionTreeItem(_ReadBase):
-    id: UUID
-    slug: str
-    name: str
-    pages: list[PageTreeItem]
-
-
-class SpaceTreeItem(_ReadBase):
-    id: UUID
-    slug: str
-    name: str
-    collections: list[CollectionTreeItem]
-
-
-class WorkspaceTree(_ReadBase):
-    id: UUID
-    org_id: UUID
-    slug: str
-    name: str
-    spaces: list[SpaceTreeItem]
 
 
 # ---------------------------------------------------------------------------
@@ -211,7 +193,7 @@ class OrganizationRead(_ReadBase):
 
 class OrgMembershipCreate(BaseModel):
     email: str
-    role: str  # "owner" | "editor" | "viewer"
+    role: str
 
 
 class OrgMembershipRead(_ReadBase):
@@ -241,5 +223,5 @@ class UserRead(_ReadBase):
 class AuthStatus(BaseModel):
     authenticated: bool
     user: UserRead | None = None
-    method: str  # "session", "api_key", or "anonymous"
+    method: str
     oidc_enabled: bool
