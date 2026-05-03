@@ -154,13 +154,12 @@ class AttachmentRead(_ReadBase):
 
 
 class SearchResultItem(BaseModel):
-    page_id: UUID
-    title: str
+    node_id: UUID
+    name: str
     snippet: str
-    collection_id: UUID
     space_id: UUID
     space_name: str
-    collection_name: str
+    node_path: list[str]
     rank: float
 
 
