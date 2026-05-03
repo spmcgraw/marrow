@@ -5,7 +5,7 @@ engine) without touching routers or frontend code.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from uuid import UUID
 
 from sqlalchemy import text
@@ -14,13 +14,12 @@ from sqlalchemy.orm import Session
 
 @dataclass
 class SearchResult:
-    page_id: UUID
-    title: str
+    node_id: UUID
+    name: str
     snippet: str
-    collection_id: UUID
     space_id: UUID
     space_name: str
-    collection_name: str
+    node_path: list[str]
     rank: float
 
 
@@ -36,6 +35,22 @@ class SearchBackend(ABC):
     ) -> list[SearchResult]:
         """Search pages within a workspace. Returns ranked results."""
         ...
+
+
+# Recursive CTE fragment that resolves the ordered ancestor folder names for a
+# given node. Yields one row with an `ancestors` text[] column (root → leaf).
+_ANCESTOR_PATH_CTE = """
+    WITH RECURSIVE anc(nm, parent_id, depth) AS (
+        SELECT p.name, p.parent_id, 1
+        FROM nodes p
+        WHERE p.id = n.parent_id
+        UNION ALL
+        SELECT p2.name, p2.parent_id, a.depth + 1
+        FROM nodes p2
+        JOIN anc a ON p2.id = a.parent_id
+    )
+    SELECT ARRAY(SELECT nm FROM anc ORDER BY depth DESC)
+"""
 
 
 class PostgresSearchBackend(SearchBackend):
@@ -61,21 +76,24 @@ class PostgresSearchBackend(SearchBackend):
         limit: int,
     ) -> list[SearchResult]:
         """Return all pages in the workspace ordered by most recently revised."""
-        sql = text("""
+        sql = text(f"""
             SELECT
-                p.id AS page_id,
-                p.title,
+                n.id AS node_id,
+                n.name,
                 '' AS snippet,
-                p.collection_id,
                 s.id AS space_id,
                 s.name AS space_name,
-                c.name AS collection_name,
+                COALESCE(
+                    ({_ANCESTOR_PATH_CTE}),
+                    ARRAY[]::text[]
+                ) AS node_path,
                 0.0 AS rank
-            FROM pages p
-            JOIN revisions r ON r.id = p.current_revision_id
-            JOIN collections c ON c.id = p.collection_id
-            JOIN spaces s ON s.id = c.space_id
+            FROM nodes n
+            JOIN revisions r ON r.id = n.current_revision_id
+            JOIN spaces s ON s.id = n.space_id
             WHERE s.workspace_id = :workspace_id
+              AND n.type = 'page'
+              AND n.deleted_at IS NULL
             ORDER BY r.created_at DESC
             LIMIT :limit
         """)
@@ -90,13 +108,13 @@ class PostgresSearchBackend(SearchBackend):
         *,
         limit: int,
     ) -> list[SearchResult]:
-        """Title ILIKE match ranked first, FTS body match as secondary signal."""
-        sql = text("""
+        """Name ILIKE match ranked first, FTS body match as secondary signal."""
+        sql = text(f"""
             SELECT
-                p.id AS page_id,
-                p.title,
+                n.id AS node_id,
+                n.name,
                 CASE
-                    WHEN p.search_vector @@ plainto_tsquery('english', :query)
+                    WHEN n.search_vector @@ plainto_tsquery('english', :query)
                     THEN ts_headline(
                         'english',
                         r.content,
@@ -105,21 +123,24 @@ class PostgresSearchBackend(SearchBackend):
                     )
                     ELSE ''
                 END AS snippet,
-                p.collection_id,
                 s.id AS space_id,
                 s.name AS space_name,
-                c.name AS collection_name,
-                CASE WHEN p.title ILIKE :title_pattern THEN 1 ELSE 0 END
-                    + ts_rank(p.search_vector, plainto_tsquery('english', :query))
+                COALESCE(
+                    ({_ANCESTOR_PATH_CTE}),
+                    ARRAY[]::text[]
+                ) AS node_path,
+                CASE WHEN n.name ILIKE :name_pattern THEN 1 ELSE 0 END
+                    + ts_rank(n.search_vector, plainto_tsquery('english', :query))
                     AS rank
-            FROM pages p
-            JOIN revisions r ON r.id = p.current_revision_id
-            JOIN collections c ON c.id = p.collection_id
-            JOIN spaces s ON s.id = c.space_id
+            FROM nodes n
+            JOIN revisions r ON r.id = n.current_revision_id
+            JOIN spaces s ON s.id = n.space_id
             WHERE s.workspace_id = :workspace_id
+              AND n.type = 'page'
+              AND n.deleted_at IS NULL
               AND (
-                  p.title ILIKE :title_pattern
-                  OR p.search_vector @@ plainto_tsquery('english', :query)
+                  n.name ILIKE :name_pattern
+                  OR n.search_vector @@ plainto_tsquery('english', :query)
               )
             ORDER BY rank DESC, r.created_at DESC
             LIMIT :limit
@@ -129,7 +150,7 @@ class PostgresSearchBackend(SearchBackend):
             {
                 "workspace_id": workspace_id,
                 "query": query,
-                "title_pattern": f"%{query}%",
+                "name_pattern": f"%{query}%",
                 "limit": limit,
             },
         ).fetchall()
@@ -138,12 +159,11 @@ class PostgresSearchBackend(SearchBackend):
     @staticmethod
     def _row_to_result(row) -> "SearchResult":
         return SearchResult(
-            page_id=row.page_id,
-            title=row.title,
+            node_id=row.node_id,
+            name=row.name,
             snippet=row.snippet,
-            collection_id=row.collection_id,
             space_id=row.space_id,
             space_name=row.space_name,
-            collection_name=row.collection_name,
+            node_path=list(row.node_path) if row.node_path else [],
             rank=row.rank,
         )

@@ -126,7 +126,10 @@ marrow/
 │   │       ├── d3981f696939_add_full_text_search.py
 │   │       ├── 35eb203afc65_add_users_table.py
 │   │       ├── 0999ffe7b838_add_organizations_and_rbac.py
-│   │       └── c333d20a46d9_add_content_format_to_revisions.py
+│   │       ├── c333d20a46d9_add_content_format_to_revisions.py
+│   │       ├── bd52bac0673f_node_tree_schema_collapse_collections_.py
+│   │       ├── 2b5326d2d299_add_rls_tenant_isolation.py
+│   │       └── fdf65c08ffa8_add_node_fts_triggers_and_gin_index.py
 │   ├── marrow/                       # Main package
 │   │   ├── app.py                    # FastAPI app factory, CORS + session middleware
 │   │   ├── auth.py                   # OIDC config, session JWT helpers, cookie params
@@ -272,7 +275,9 @@ All routes are prefixed with `/api`. Authentication is enforced via session cook
 | GET/POST | /api/workspaces/{id}/spaces/ | List / create spaces | viewer/editor |
 | GET/DELETE | /api/workspaces/{id}/spaces/{sid} | Get / delete space | viewer/owner |
 
-> **Note (#123 → #124):** v0.1's collection-scoped and global page routes were removed by the schema migration. Node CRUD/tree/attachment/revision routes land in #124 (2.0b) under `/api/nodes/...` and `/api/spaces/{sid}/nodes`. The workspace `/tree`, `/search`, `/export`, and `/restore` endpoints are still wired but their handlers will NameError at runtime until the node-aware rewrites land in #124, #125, #132, and #133.
+> **Note (#123 → #125):** v0.1's collection-scoped and global page routes were removed by the schema migration. Node CRUD/tree/attachment/revision routes land in #124 (2.0b) under `/api/nodes/...` and `/api/spaces/{sid}/nodes`. The workspace `/search` endpoint is node-aware as of #125 (2.0c). The `/tree`, `/export`, and `/restore` endpoints are still wired but their handlers will NameError at runtime until the node-aware rewrites land in #124, #132, and #133.
+>
+> **Search response shape (v0.2):** `SearchResultItem` fields are `node_id`, `name`, `snippet`, `space_id`, `space_name`, `node_path` (list of ancestor folder names, root→leaf), `rank`. The old `page_id`, `title`, `collection_id`, `collection_name` fields are gone.
 
 ### Storage Adapter Interface
 
@@ -286,7 +291,7 @@ class StorageAdapter(ABC):
 
 ### Export Bundle Format
 
-```
+```text
 marrow-export-{workspace-slug}-{timestamp}.zip          # full
 marrow-export-{workspace-slug}-slim-{timestamp}.zip     # slim
 ├── manifest.json        # workspace + org metadata, all entity IDs, schema version (v3)
